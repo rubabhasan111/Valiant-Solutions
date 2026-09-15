@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "car-service-payments",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", ".claude\\dev-server.cmd"],
+      "port": 3000
+    }
+  ]
+}

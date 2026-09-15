@@ -1,0 +1,38 @@
+{
+  "name": "car-service-payments",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db": "node scripts/local-db.mjs",
+    "db:import-sqlite": "node scripts/import-sqlite.mjs",
+    "admin:create": "node scripts/create-admin.mjs"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "@stripe/connect-js": "^3.4.6",
+    "@stripe/react-connect-js": "^3.4.4",
+    "@vercel/functions": "^3.9.7",
+    "animejs": "^4.5.0",
+    "next": "16.3.5",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "stripe": "^22.6.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

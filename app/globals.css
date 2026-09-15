@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/*
+  Palette adapted from the Wise-inspired DESIGN.md in VoltAgent/awesome-design-md:
+  sage canvas, olive near-black ink, one lime accent. Lime is never used as text on
+  light surfaces; --accent-ink carries the accent there instead.
+  Radius rule: buttons and cards 24px, inputs 12px, status chips full pill.
+*/
+:root {
+  --canvas: #e8ebe6;
+  --surface: #f6f7f4;
+  --ink: #0e0f0c;
+  --body: #454745;
+  --mute: #5f615d;
+  --edge: #c9cec4;
+  --field-edge: #858981;
+  --accent: #9fe870;
+  --accent-hover: #b8f193;
+  --on-accent: #0e0f0c;
+  --accent-ink: #163300;
+  --accent-pale: #d6eec5;
+  --pending: #6f4400;
+  --pending-pale: #f5e2b3;
+  --danger: #9e1d24;
+  --danger-pale: #f5d6d7;
+  --focus: #0e0f0c;
+  --engine: rgb(14 15 12 / 0.17);
+  --spark: #4f9a24;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0e0f0c;
+    --surface: #161814;
+    --ink: #eef1ea;
+    --body: #c0c4bb;
+    --mute: #9a9e95;
+    --edge: #2b2f27;
+    --field-edge: #5d6258;
+    --accent: #9fe870;
+    --accent-hover: #b8f193;
+    --on-accent: #0e0f0c;
+    --accent-ink: #9fe870;
+    --accent-pale: #1e2b14;
+    --pending: #ffd166;
+    --pending-pale: #372a0b;
+    --danger: #ff9095;
+    --danger-pale: #3a1315;
+    --focus: #9fe870;
+    --engine: rgb(238 241 234 / 0.13);
+    --spark: #9fe870;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-mute: var(--mute);
+  --color-edge: var(--edge);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-pale: var(--accent-pale);
+  --color-pending: var(--pending);
+  --color-pending-pale: var(--pending-pale);
+  --color-danger: var(--danger);
+  --color-danger-pale: var(--danger-pale);
+  --font-sans: var(--font-manrope);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Elements that anime.js reveals start hidden, unless the visitor prefers reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+  [data-hero],
+  [data-reveal],
+  [data-instalment] {
+    opacity: 0;
+  }
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 24px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+  .btn:disabled {
+    cursor: progress;
+    opacity: 0.75;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+  .btn-secondary:hover {
+    background: color-mix(in oklab, var(--ink) 7%, transparent);
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--field-edge);
+    background: var(--canvas);
+    color: var(--ink);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    transition: border-color 0.15s ease;
+  }
+  .field:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+  .field:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+    border-color: var(--ink);
+  }
+  .field:disabled {
+    opacity: 0.6;
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+}
