@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// This page reads the database but uses no cookies or headers, so Next would prerender it
+// and a CDN would keep serving the setup form long after the first admin exists.
+export const dynamic = "force-dynamic";
+
 // One-time page for creating the first Halfshaft admin on a new deployment, so nobody has
 // to run a script against the production database. It closes itself once an admin exists.
 export default async function AdminSetupPage() {
