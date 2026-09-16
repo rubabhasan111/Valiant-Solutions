@@ -11,7 +11,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    if (pathname === "/admin/login" || request.cookies.has(ADMIN_SESSION_COOKIE)) return NextResponse.next();
+    // The setup page guards itself: it needs the setup key and closes once an admin exists.
+    const openToEveryone = pathname === "/admin/login" || pathname === "/admin/setup";
+    if (openToEveryone || request.cookies.has(ADMIN_SESSION_COOKIE)) return NextResponse.next();
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
