@@ -84,7 +84,21 @@ in at `https://<your-app>/admin/login`.
 4. Endpoint URL: `https://<your-app>/api/webhooks/stripe`.
 5. Copy the signing secret (`whsec_...`) into `STRIPE_WEBHOOK_SECRET` on Vercel and redeploy.
 
-## 7. Schedule the debit job on cron-job.org
+## 7. Schedule the debit job
+
+Either of these works. GitHub Actions needs no extra account; cron-job.org keeps better time.
+
+### Option A: GitHub Actions (no new account)
+
+`.github/workflows/debits.yml` is already in the repository and runs every 15 minutes.
+Add the secret it needs: on GitHub, **Settings → Secrets and variables → Actions → New
+repository secret**, name `CRON_SECRET`, value the same string as in Vercel.
+
+Then open the **Actions** tab, choose **Run debit job**, and use **Run workflow** to test it.
+A run should print `HTTP 202`. GitHub can delay scheduled runs by 10-30 minutes when busy,
+so move to option B (or a Vercel cron on Pro) once real customers are being debited.
+
+### Option B: cron-job.org
 
 1. **Create cronjob**.
 2. URL: `https://<your-app>/api/cron/debits?background=1`
