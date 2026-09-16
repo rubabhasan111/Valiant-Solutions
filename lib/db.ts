@@ -373,7 +373,15 @@ async function getPool(): Promise<pg.Pool> {
     const connectionString =
       process.env.DATABASE_URL ?? process.env.DATABASE_URL_POSTGRES_URL ?? process.env.POSTGRES_URL;
     if (!connectionString) {
-      throw new Error("DATABASE_URL isn't set. Locally, `npm run dev` starts a Postgres database for you.");
+      // Names only, never values: this tells a deployment which database variables reached it.
+      const visible =
+        Object.keys(process.env)
+          .filter((name) => /DATABASE|POSTGRES|^PG/.test(name))
+          .sort()
+          .join(", ") || "none";
+      throw new Error(
+        `DATABASE_URL isn't set. Database variables visible to this deployment: ${visible}. Locally, \`npm run dev\` starts a Postgres database for you.`,
+      );
     }
     const pool = new pg.Pool({ connectionString, types, max: 5, idleTimeoutMillis: 10_000 });
     pool.on("error", (err) => console.error("Idle Postgres connection failed:", err));
