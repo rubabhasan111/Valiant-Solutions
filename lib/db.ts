@@ -370,8 +370,13 @@ async function getPool(): Promise<pg.Pool> {
     // Vercel's Neon integration writes the connection string under a prefixed name when a
     // prefix was set while connecting the database, e.g. DATABASE_URL_POSTGRES_URL. Both
     // of those are the pooled connection.
-    const connectionString =
-      process.env.DATABASE_URL ?? process.env.DATABASE_URL_POSTGRES_URL ?? process.env.POSTGRES_URL;
+    // A variable that exists but is empty counts as unset: Vercel keeps a variable with a
+    // blank value, which would otherwise win over Neon's.
+    const connectionString = [
+      process.env.DATABASE_URL,
+      process.env.DATABASE_URL_POSTGRES_URL,
+      process.env.POSTGRES_URL,
+    ].find((value) => value && value.trim().length > 0);
     if (!connectionString) {
       // Names only, never values: this tells a deployment which database variables reached it.
       const visible =
