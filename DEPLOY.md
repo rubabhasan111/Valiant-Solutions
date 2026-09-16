@@ -32,8 +32,14 @@ git push -u origin main
 1. In the Vercel project, **Storage → Create Database → Neon**.
 2. Choose the **Sydney (AWS ap-southeast-2)** region and connect it to the project.
 
-Vercel adds `DATABASE_URL` for you. The tables are created automatically the first time the
-app runs.
+Vercel adds the connection string for you. The tables are created automatically the first
+time the app runs.
+
+If you typed a prefix while connecting the database, Neon names its variables after it, for
+example `DATABASE_URL_POSTGRES_URL` instead of `DATABASE_URL`. The app reads
+`DATABASE_URL` first, then `DATABASE_URL_POSTGRES_URL`, then `POSTGRES_URL`, so either
+naming works. Just make sure no leftover `DATABASE_URL` is still pointing at localhost:
+delete it if the import created one from `.env.example`.
 
 ## 4. Environment variables
 

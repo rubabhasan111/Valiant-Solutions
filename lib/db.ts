@@ -367,7 +367,11 @@ const globalForDb = globalThis as unknown as { __halfshaftDb?: { pool: pg.Pool; 
 async function getPool(): Promise<pg.Pool> {
   let state = globalForDb.__halfshaftDb;
   if (!state) {
-    const connectionString = process.env.DATABASE_URL;
+    // Vercel's Neon integration writes the connection string under a prefixed name when a
+    // prefix was set while connecting the database, e.g. DATABASE_URL_POSTGRES_URL. Both
+    // of those are the pooled connection.
+    const connectionString =
+      process.env.DATABASE_URL ?? process.env.DATABASE_URL_POSTGRES_URL ?? process.env.POSTGRES_URL;
     if (!connectionString) {
       throw new Error("DATABASE_URL isn't set. Locally, `npm run dev` starts a Postgres database for you.");
     }
