@@ -134,6 +134,15 @@ export default async function CustomerPlanPage({ params, searchParams }: PagePro
         </section>
       )}
 
+      <section className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-3xl border border-edge bg-surface px-6 py-5">
+        <p className="text-sm leading-relaxed text-body">
+          Paying more than one workshop, or want this plan on your phone? Sign in with your email address.
+        </p>
+        <a href="/account/login" className="text-sm font-semibold text-accent-ink underline-offset-2 hover:underline">
+          See all your payments
+        </a>
+      </section>
+
       <section className="mt-6 rounded-3xl border border-edge bg-surface">
         <h2 className="px-5 pt-5 text-lg font-bold">Payment schedule</h2>
         <ol className="tabular mt-3 divide-y divide-edge border-t border-edge">

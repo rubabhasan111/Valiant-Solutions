@@ -127,6 +127,20 @@ export function receiptEmail(
   };
 }
 
+// Sent as Halfshaft, not as a workshop: one code covers every workshop the customer pays.
+export function signInCodeMessages(input: { code: string; minutes: number; customerName: string }): {
+  email: EmailContent;
+  sms: string;
+} {
+  return {
+    email: {
+      subject: `${input.code} is your Halfshaft sign-in code`,
+      text: `Hi ${firstName(input.customerName)},\n\nYour code to sign in and see your repayment plans is:\n\n${input.code}\n\nIt expires in ${input.minutes} minutes and can be used once. If you didn't ask for it, you can ignore this email.\n\nHalfshaft`,
+    },
+    sms: `${input.code} is your Halfshaft sign-in code. It expires in ${input.minutes} minutes.`,
+  };
+}
+
 export function paymentFailedSms(input: Sender & { amountCents: number; retryText: string }): string {
   return `${input.centreName}: your payment of ${formatAud(input.amountCents)} for ${input.description} didn't go through. We'll try again ${input.retryText}, so please make sure the funds are in your account.${smsQuestions(input)}`;
 }

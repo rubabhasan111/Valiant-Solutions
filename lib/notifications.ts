@@ -32,8 +32,9 @@ const QUEUE_SMS = `
 
 // Queues an email with no Activity entry, for messages only the customer needs. Returns how
 // many were queued: 0 when this message has already been queued under the same key.
+// centreId is null for messages that aren't about one workshop, such as a sign-in code.
 export async function queueCustomerEmail(
-  centreId: number,
+  centreId: number | null,
   email: EmailInput,
   dedupeKey: string,
   sql: Sql = db,
@@ -43,7 +44,12 @@ export async function queueCustomerEmail(
 
 // Queues a text with no Activity entry. Returns 0 when the number isn't an Australian mobile
 // (so the caller can fall back to email) or the text was already queued.
-export async function queueCustomerSms(centreId: number, sms: SmsInput, dedupeKey: string, sql: Sql = db): Promise<number> {
+export async function queueCustomerSms(
+  centreId: number | null,
+  sms: SmsInput,
+  dedupeKey: string,
+  sql: Sql = db,
+): Promise<number> {
   const mobile = sms.to ? normaliseAuMobile(sms.to) : null;
   if (!mobile) return 0;
   return sql.run(QUEUE_SMS, [centreId, null, mobile, sms.body, dedupeKey]);

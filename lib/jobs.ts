@@ -1,3 +1,4 @@
+import { purgeOldAuthAttempts } from "@/lib/auth/rate-limit";
 import { db } from "@/lib/db";
 import { runDebitJob, type DebitJobResult } from "@/lib/debits";
 import { deliverPendingMessages, type MessageDeliveryResult } from "@/lib/messaging";
@@ -49,6 +50,7 @@ export async function runDebitsAndEmails(asOf: string, trigger: JobTrigger, opti
   try {
     const debits = await runDebitJob(asOf);
     const reminders = await sendPaymentReminders(asOf, { ignoreQuietHours: options.ignoreQuietHours });
+    await purgeOldAuthAttempts();
     const messages = await deliverPendingMessages();
     const summary = summariseDebitRun(debits, reminders, messages);
     await db.run("UPDATE job_runs SET finished_at = now(), result = $1 WHERE id = $2", [JSON.stringify(summary), run!.id]);

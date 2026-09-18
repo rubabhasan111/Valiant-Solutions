@@ -1,9 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
 import { getDummyHash, verifyPassword } from "@/lib/auth/password";
+import { callerAddress } from "@/lib/auth/caller";
+import {
+  checkRateLimit,
+  clearAttempts,
+  recordFailedAttempt,
+  tooManyAttemptsMessage,
+} from "@/lib/auth/rate-limit";
 import { createWorkshopSession } from "@/lib/auth/session";
+import { db } from "@/lib/db";
 
 export type LoginState = { error?: string; email?: string } | undefined;
 
@@ -19,6 +26,10 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   if (!email || !password) return { error: "Enter your email and password.", email };
 
+  const address = await callerAddress();
+  const limit = await checkRateLimit("workshop_login", email, address);
+  if (!limit.allowed) return { error: tooManyAttemptsMessage(limit.retryAfterMinutes), email };
+
   const user = await db.one<{ id: number; password_hash: string; suspended: boolean }>(
     `SELECT u.id, u.password_hash,
             EXISTS (
@@ -32,12 +43,16 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   );
 
   const valid = await verifyPassword(password, user?.password_hash ?? (await getDummyHash()));
-  if (!user || !valid) return { error: "That email and password don't match an account.", email };
+  if (!user || !valid) {
+    await recordFailedAttempt("workshop_login", email, address);
+    return { error: "That email and password don't match an account.", email };
+  }
   // Only revealed after a correct password, so it doesn't confirm which emails have accounts.
   if (user.suspended) {
     return { error: "Halfshaft access for this workshop is paused. Contact Halfshaft to restore it.", email };
   }
 
+  await clearAttempts("workshop_login", email);
   await createWorkshopSession(user.id);
   redirect(safeNext(formData.get("next")));
 }
