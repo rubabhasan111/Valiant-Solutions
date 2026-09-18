@@ -24,6 +24,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             Halfshaft admin
           </Link>
           <div className="flex items-center gap-5">
+            <Link href="/admin/system" className="text-sm font-semibold text-body transition-colors hover:text-ink">
+              System
+            </Link>
             <Link href="/admin/team" className="text-sm font-semibold text-body transition-colors hover:text-ink">
               Team
             </Link>
