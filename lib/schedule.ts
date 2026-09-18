@@ -93,6 +93,28 @@ export function formatDate(iso: string): string {
   return displayDate.format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+const shortDay = new Intl.DateTimeFormat("en-AU", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+// "Wed 1 Oct", short enough for a text message.
+export function formatShortDay(iso: string): string {
+  const { y, m, d } = dateParts(iso.slice(0, 10));
+  const parts = shortDay.formatToParts(new Date(Date.UTC(y, m - 1, d)));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("weekday")} ${part("day")} ${part("month")}`;
+}
+
+// The current hour (0-23) in Sydney, for keeping texts to daytime.
+export function hourInSydney(now = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", hour: "numeric", hourCycle: "h23" }).format(now),
+  );
+}
+
 // "today" (for today or an overdue date), "tomorrow", or "on 17 Sept 2026".
 export function formatRetryDay(iso: string): string {
   const today = todayInSydney();

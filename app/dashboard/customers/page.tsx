@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, UsersThree } from "@phosphor-icons/react/ssr";
 import { requireWorkshop } from "@/lib/auth/dal";
+import { formatAuMobile } from "@/lib/phone";
 import { listCustomers } from "@/lib/plans";
 import { formatDate } from "@/lib/schedule";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -44,7 +45,7 @@ export default async function CustomersPage() {
                   <tr className="text-xs text-mute">
                     <th scope="col" className="px-5 py-3 font-semibold">Name</th>
                     <th scope="col" className="px-5 py-3 font-semibold">Vehicle</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Phone</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Mobile</th>
                     <th scope="col" className="px-5 py-3 font-semibold">Plans</th>
                     <th scope="col" className="px-5 py-3 font-semibold">Added</th>
                     <th scope="col" className="px-5 py-3">
@@ -60,7 +61,9 @@ export default async function CustomersPage() {
                         <p className="mt-0.5 text-xs text-mute">{customer.email}</p>
                       </td>
                       <td className="px-5 py-4 text-body">{customer.vehicle_rego ?? "Not recorded"}</td>
-                      <td className="px-5 py-4 text-body">{customer.phone ?? "Not recorded"}</td>
+                      <td className="px-5 py-4 text-body">
+                        {customer.phone ? formatAuMobile(customer.phone) : "Not recorded"}
+                      </td>
                       <td className="tabular px-5 py-4 text-body">{customer.plan_count}</td>
                       <td className="tabular px-5 py-4 text-body">{formatDate(customer.created_at)}</td>
                       <td className="px-5 py-4 text-right">

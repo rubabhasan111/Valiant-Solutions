@@ -144,7 +144,7 @@ export async function getPlanDetail(centreId: number, planId: number): Promise<P
 }
 
 export type PublicPlan = PlanDetail & {
-  centre: Pick<ServiceCentre, "id" | "name" | "stripe_account_id" | "charges_enabled" | "becs_capability">;
+  centre: Pick<ServiceCentre, "id" | "name" | "phone" | "stripe_account_id" | "charges_enabled" | "becs_capability">;
 };
 
 // Looks up a plan by the token in the customer's setup link. The token is the only
@@ -157,7 +157,7 @@ export async function getPlanByToken(token: string): Promise<PublicPlan | null> 
   if (!detail) return null;
 
   const centre = await db.one<PublicPlan["centre"]>(
-    "SELECT id, name, stripe_account_id, charges_enabled, becs_capability FROM service_centres WHERE id = $1",
+    "SELECT id, name, phone, stripe_account_id, charges_enabled, becs_capability FROM service_centres WHERE id = $1",
     [detail.plan.service_centre_id],
   );
   return { ...detail, centre: centre! };

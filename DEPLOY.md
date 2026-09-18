@@ -53,6 +53,7 @@ In **Settings → Environment Variables** (Production and Preview):
 | `CRON_SECRET` | A long random string (generate one below) |
 | `STRIPE_WEBHOOK_SECRET` | Added in step 6 |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Leave unset until you have a domain; emails are recorded but not sent |
+| `CLICKSEND_USERNAME`, `CLICKSEND_API_KEY`, `SMS_SENDER` | Leave unset until you have a ClickSend account; texts are recorded but not sent |
 
 Generate `CRON_SECRET`:
 
@@ -118,6 +119,35 @@ cron-job.org stops waiting after 30 seconds. Each run shows on the admin page un
    account `000123456`).
 3. When the first instalment is due, the scheduler charges it. Check the payment on the
    workshop's Stripe account and in `/admin`.
+
+## 9. Messages to customers
+
+Until these are set up, every email and text is recorded in the database and marked
+"skipped", so nothing is lost and nothing is sent.
+
+### Email (needs a domain)
+
+1. Create a free account at resend.com.
+2. **Domains → Add domain**, then add the DNS records it shows at your domain provider.
+3. **API keys → Create**, and put it in Vercel as `RESEND_API_KEY` (Type Secret).
+4. Set `EMAIL_FROM` to something like `Halfshaft <payments@yourdomain.com.au>` (Type Config).
+
+Customer emails are sent in the workshop's name from that address, with **Reply-To set to
+the workshop**, so a customer's reply reaches the mechanic.
+
+Without a domain you can still test: Resend lets you send from `onboarding@resend.dev`, but
+only to your own account's email address.
+
+### Text messages
+
+1. Create an account at clicksend.com and buy a little credit (texts cost a few cents each).
+2. Find the API username and API key in the dashboard.
+3. Put them in Vercel as `CLICKSEND_USERNAME` and `CLICKSEND_API_KEY` (Type Secret).
+4. Optionally set `SMS_SENDER` to a name of up to 11 letters and numbers, e.g. `Halfshaft`.
+   Australia is introducing a register of sender names, so check ClickSend's requirements.
+
+Customers get a text when a plan is created, two days before each payment, and if a payment
+fails. Anyone without a mobile number on file gets an email instead.
 
 ## Going live later
 

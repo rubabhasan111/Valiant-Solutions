@@ -19,6 +19,9 @@ export function LoginForm({ next }: { next?: string }) {
       <button type="submit" className="btn btn-primary w-full" disabled={pending}>
         {pending ? "Logging in" : "Log in"}
       </button>
+      <a href="/forgot-password" className="text-center text-sm font-semibold text-body underline-offset-2 hover:text-ink hover:underline">
+        Forgot your password?
+      </a>
     </form>
   );
 }

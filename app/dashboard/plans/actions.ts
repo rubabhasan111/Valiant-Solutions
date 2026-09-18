@@ -1,8 +1,12 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireWorkshop } from "@/lib/auth/dal";
+import { deliverPendingMessages } from "@/lib/messaging";
 import { formatAud } from "@/lib/money";
+import { normaliseAuMobile } from "@/lib/phone";
+import { queuePlanLink } from "@/lib/plan-links";
 import { createPlan, customerEmailExists, getCustomer, type NewCustomer } from "@/lib/plans";
 import {
   isFrequency,
@@ -19,6 +23,7 @@ type Field =
   | "customerId"
   | "fullName"
   | "email"
+  | "phone"
   | "description"
   | "total"
   | "instalmentCount"
@@ -53,15 +58,18 @@ export async function createPlanAction(_prev: PlanFormState, formData: FormData)
   let customer: { id: number } | NewCustomer | null = null;
   const customerChoice = formText(formData, "customerId");
   if (customerChoice === "new") {
+    const mobile = normaliseAuMobile(values.phone);
     if (!values.fullName) fieldErrors.fullName = "Enter the customer's full name.";
     if (!EMAIL.test(values.email)) fieldErrors.email = "Enter a valid email address.";
     else if (await customerEmailExists(centre.id, values.email)) {
       fieldErrors.email = "This customer already exists. Choose them from the list above.";
     }
+    if (!values.phone) fieldErrors.phone = "Enter the customer's mobile. Payment reminders are texted to it.";
+    else if (!mobile) fieldErrors.phone = "Enter an Australian mobile, for example 0412 345 678.";
     customer = {
       fullName: values.fullName,
       email: values.email,
-      phone: values.phone || null,
+      phone: mobile,
       vehicleRego: values.vehicleRego.slice(0, 12) || null,
     };
   } else {
@@ -105,6 +113,10 @@ export async function createPlanAction(_prev: PlanFormState, formData: FormData)
     frequency,
     startDate,
   });
+
+  // Email and text the customer their link straight away, without holding up the page.
+  await queuePlanLink(planId, "created");
+  after(() => deliverPendingMessages());
 
   redirect(`/dashboard/plans/${planId}?created=1`);
 }

@@ -32,8 +32,11 @@ function minutesSince(iso: string): number {
 function describeRun(run: JobRun): string {
   if (run.error) return `Failed: ${run.error}`;
   if (!run.result) return "Still running";
-  const { charged, failed, settledFromStripe, emails } = run.result;
-  return `${charged} charged, ${failed} failed, ${settledFromStripe} settled with Stripe, ${emails.sent} emails sent`;
+  const { charged = 0, failed = 0, settledFromStripe = 0, emails, texts, reminders } = run.result;
+  const parts = [`${charged} charged`, `${failed} failed`, `${settledFromStripe} settled with Stripe`];
+  if (reminders) parts.push(`${reminders.texted + reminders.emailed} reminders sent`);
+  parts.push(`${emails?.sent ?? 0} emails and ${texts?.sent ?? 0} texts sent`);
+  return parts.join(", ");
 }
 
 export default async function AdminOverviewPage({ searchParams }: PageProps<"/admin">) {
@@ -136,10 +139,12 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
         </form>
       </section>
 
-      {(overview.emailsFailed > 0 || overview.emailsSkipped > 0) && (
+      {(overview.emailsFailed > 0 || overview.emailsSkipped > 0 || overview.textsFailed > 0 || overview.textsSkipped > 0) && (
         <p className="mt-6 rounded-2xl bg-pending-pale px-5 py-3 text-sm font-semibold text-pending">
           {overview.emailsFailed > 0 && `${overview.emailsFailed} emails failed to send. `}
-          {overview.emailsSkipped > 0 && `${overview.emailsSkipped} emails were skipped because email delivery isn't set up.`}
+          {overview.textsFailed > 0 && `${overview.textsFailed} texts failed to send. `}
+          {(overview.emailsSkipped > 0 || overview.textsSkipped > 0) &&
+            `${overview.emailsSkipped} emails and ${overview.textsSkipped} texts were skipped because sending isn't set up yet.`}
         </p>
       )}
 

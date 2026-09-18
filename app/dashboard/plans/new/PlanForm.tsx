@@ -99,7 +99,17 @@ export function PlanForm({ customers, today, initialCustomerId }: PlanFormProps)
                 error={errors?.email}
               />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field id="phone" type="tel" label="Phone" optional autoComplete="off" defaultValue={values?.phone} />
+                <Field
+                  id="phone"
+                  type="tel"
+                  label="Mobile"
+                  hint="Payment reminders are texted here."
+                  placeholder="0412 345 678"
+                  autoComplete="off"
+                  required
+                  defaultValue={values?.phone}
+                  error={errors?.phone}
+                />
                 <Field
                   id="vehicleRego"
                   label="Vehicle rego"
@@ -220,7 +230,7 @@ export function PlanForm({ customers, today, initialCustomerId }: PlanFormProps)
             {pending ? "Creating plan" : "Create plan"}
           </button>
           <p className="mt-3 text-xs leading-relaxed text-mute">
-            Nothing is charged yet. You&apos;ll get a link to send the customer so they can add their bank details.
+            Nothing is charged yet. The customer is emailed and texted a link to add their bank details.
           </p>
         </section>
       </aside>

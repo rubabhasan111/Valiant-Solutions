@@ -3,6 +3,7 @@ import { completeBankSetup } from "@/lib/bank-setup";
 import { db } from "@/lib/db";
 import { applyPaymentIntent } from "@/lib/debits";
 import { notify } from "@/lib/notifications";
+import { directDebitCancelledSms } from "@/lib/plan-messages";
 import { getPlanByToken } from "@/lib/plans";
 import { appUrl, getStripe } from "@/lib/stripe";
 
@@ -31,11 +32,13 @@ async function applyMandate(mandate: Stripe.Mandate, accountId: string) {
     setup_token: string;
     centre_id: number;
     centre_name: string;
+    centre_phone: string | null;
     full_name: string;
     email: string;
+    phone: string | null;
   }>(
-    `SELECT p.id, p.description, p.setup_token, sc.id AS centre_id, sc.name AS centre_name,
-            c.full_name, c.email
+    `SELECT p.id, p.description, p.setup_token, sc.id AS centre_id, sc.name AS centre_name, sc.phone AS centre_phone,
+            c.full_name, c.email, c.phone
        FROM payment_plans p
        JOIN service_centres sc ON sc.id = p.service_centre_id
        JOIN customers c ON c.id = p.customer_id
@@ -61,6 +64,16 @@ async function applyMandate(mandate: Stripe.Mandate, accountId: string) {
         to: plan.email,
         subject: `Your direct debit with ${plan.centre_name} was cancelled`,
         text: `Hi ${name},\n\nYour direct debit authority for ${plan.description} has been cancelled, so ${plan.centre_name} can't collect your remaining payments.\n\nIf that wasn't intended, you can set up a new direct debit here:\n${appUrl()}/pay/${plan.setup_token}\n\n${plan.centre_name}`,
+      },
+      customerSms: {
+        to: plan.phone,
+        body: directDebitCancelledSms({
+          centreName: plan.centre_name,
+          centrePhone: plan.centre_phone,
+          customerName: plan.full_name,
+          description: plan.description,
+          link: `${appUrl()}/pay/${plan.setup_token}`,
+        }),
       },
     });
   }

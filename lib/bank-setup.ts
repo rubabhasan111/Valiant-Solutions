@@ -1,6 +1,8 @@
 import type Stripe from "stripe";
 import { formatAud } from "@/lib/money";
 import { notify } from "@/lib/notifications";
+import { normaliseAuMobile } from "@/lib/phone";
+import { planResumedEmail, setupConfirmedEmail } from "@/lib/plan-messages";
 import { activatePlan, saveCheckoutSession, saveStripeCustomerId, type PublicPlan } from "@/lib/plans";
 import { FREQUENCY_LABEL, formatDate } from "@/lib/schedule";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -80,6 +82,13 @@ export async function completeBankSetup(data: PublicPlan, sessionId: string): Pr
   if (!paymentMethodId) return false;
 
   const outcome = await activatePlan(plan.id, paymentMethodId, mandateId ?? null);
+  const sender = {
+    centreName: centre.name,
+    centrePhone: centre.phone,
+    customerName: customer.full_name,
+    description: plan.description,
+    link: `${appUrl()}/pay/${plan.setup_token}`,
+  };
 
   if (outcome === "activated") {
     await notify({
@@ -89,6 +98,19 @@ export async function completeBankSetup(data: PublicPlan, sessionId: string): Pr
       title: `${customer.full_name} set up their direct debit`,
       body: `${plan.description}: ${plan.instalment_count} ${FREQUENCY_LABEL[plan.frequency].toLowerCase()} payments of about ${formatAud(instalments[instalments.length - 1].amount_cents)}, starting ${formatDate(instalments[0].due_date)}.`,
       dedupeKey: `plan_activated:${plan.id}`,
+      customerEmail: {
+        to: customer.email,
+        ...setupConfirmedEmail({
+          ...sender,
+          totalCents: plan.total_amount_cents,
+          instalments: instalments.map((i) => ({
+            sequence: i.sequence,
+            dueDate: i.due_date,
+            amountCents: i.amount_cents,
+          })),
+          hasMobile: Boolean(customer.phone && normaliseAuMobile(customer.phone)),
+        }),
+      },
     });
   } else if (outcome === "resumed") {
     await notify({
@@ -99,6 +121,7 @@ export async function completeBankSetup(data: PublicPlan, sessionId: string): Pr
       body: `Debits on ${plan.description} have resumed. Any failed payments will be collected on the next run.`,
       dedupeKey: `bank_details_updated:${plan.id}:${paymentMethodId}`,
       emailWorkshop: true,
+      customerEmail: { to: customer.email, ...planResumedEmail(sender) },
     });
   }
 

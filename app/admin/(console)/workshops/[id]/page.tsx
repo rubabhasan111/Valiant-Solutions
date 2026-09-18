@@ -8,9 +8,11 @@ import {
   listFailedPayments,
   listWorkshopEmails,
   listWorkshopMembers,
-  type OutboxEmail,
+  listWorkshopTexts,
+  type OutboxText,
 } from "@/lib/admin/data";
 import { formatAud } from "@/lib/money";
+import { formatAuMobile } from "@/lib/phone";
 import { listPlans } from "@/lib/plans";
 import { formatDate, formatRetryDay, formatTimestamp } from "@/lib/schedule";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
@@ -35,9 +37,10 @@ const NOTICES = {
   "link-not-needed": ["bg-edge/60 text-body", "That plan isn't waiting on bank details any more."],
 } as const;
 
-const EMAIL_STATUS: Record<OutboxEmail["status"], string> = {
+const MESSAGE_STATUS: Record<OutboxText["status"], string> = {
   sent: "bg-accent-pale text-accent-ink",
   pending: "bg-pending-pale text-pending",
+  sending: "bg-pending-pale text-pending",
   skipped: "bg-edge/60 text-body",
   failed: "bg-danger-pale text-danger",
 };
@@ -54,11 +57,12 @@ export default async function AdminWorkshopPage({ params, searchParams }: PagePr
   const centre = await getWorkshop(Number(id));
   if (!centre) notFound();
 
-  const [members, plans, failedPayments, emails, audit] = await Promise.all([
+  const [members, plans, failedPayments, emails, texts, audit] = await Promise.all([
     listWorkshopMembers(centre.id),
     listPlans(centre.id),
     listFailedPayments(centre.id),
     listWorkshopEmails(centre.id),
+    listWorkshopTexts(centre.id),
     listAuditLog({ centreId: centre.id, limit: 10 }),
   ]);
 
@@ -289,11 +293,48 @@ export default async function AdminWorkshopPage({ params, searchParams }: PagePr
                     </td>
                     <td className="px-5 py-3 text-body">{email.subject}</td>
                     <td className="px-5 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${EMAIL_STATUS[email.status]}`}>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${MESSAGE_STATUS[email.status]}`}>
                         {email.status}
                       </span>
                       {email.status === "failed" && email.last_error && (
                         <p className="mt-1 max-w-[18rem] text-xs text-danger">{email.last_error}</p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-3xl border border-edge bg-surface">
+        <h2 className="px-5 pt-5 text-lg font-bold">Recent texts</h2>
+        {texts.length === 0 ? (
+          <p className="px-5 pb-5 pt-2 text-sm text-body">No texts yet.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead>
+                <tr className="text-xs text-mute">
+                  <th scope="col" className="px-5 py-3 font-semibold">Queued</th>
+                  <th scope="col" className="px-5 py-3 font-semibold">To</th>
+                  <th scope="col" className="px-5 py-3 font-semibold">Message</th>
+                  <th scope="col" className="px-5 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-edge border-t border-edge">
+                {texts.map((text) => (
+                  <tr key={text.id} className="align-top">
+                    <td className="tabular whitespace-nowrap px-5 py-3 text-body">{formatTimestamp(text.created_at)}</td>
+                    <td className="tabular whitespace-nowrap px-5 py-3">{formatAuMobile(text.recipient)}</td>
+                    <td className="max-w-[26rem] px-5 py-3 text-body">{text.body}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${MESSAGE_STATUS[text.status]}`}>
+                        {text.status}
+                      </span>
+                      {text.status === "failed" && text.last_error && (
+                        <p className="mt-1 max-w-[18rem] text-xs text-danger">{text.last_error}</p>
                       )}
                     </td>
                   </tr>

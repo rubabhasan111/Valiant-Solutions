@@ -1,7 +1,10 @@
 import { db, transaction, type Notification, type NotificationKind, type Sql } from "@/lib/db";
+import { normaliseAuMobile } from "@/lib/phone";
 import { appUrl } from "@/lib/stripe";
 
 type EmailInput = { to: string; subject: string; text: string };
+// `to` is whatever phone number is on file; texts are only queued for valid Australian mobiles.
+type SmsInput = { to: string | null; body: string };
 
 type NotifyInput = {
   centreId: number;
@@ -14,6 +17,7 @@ type NotifyInput = {
   dedupeKey: string;
   emailWorkshop?: boolean;
   customerEmail?: EmailInput;
+  customerSms?: SmsInput;
 };
 
 const QUEUE_EMAIL = `
@@ -21,13 +25,32 @@ const QUEUE_EMAIL = `
   VALUES ($1, $2, $3, $4, $5, $6, $7)
   ON CONFLICT (dedupe_key) DO NOTHING`;
 
-// Queues an email with no Activity entry, for messages only the customer needs.
-export async function queueCustomerEmail(centreId: number, email: EmailInput, dedupeKey: string, sql: Sql = db) {
-  await sql.run(QUEUE_EMAIL, [centreId, null, "customer", email.to, email.subject, email.text, dedupeKey]);
+const QUEUE_SMS = `
+  INSERT INTO sms_outbox (service_centre_id, notification_id, recipient, body, dedupe_key)
+  VALUES ($1, $2, $3, $4, $5)
+  ON CONFLICT (dedupe_key) DO NOTHING`;
+
+// Queues an email with no Activity entry, for messages only the customer needs. Returns how
+// many were queued: 0 when this message has already been queued under the same key.
+export async function queueCustomerEmail(
+  centreId: number,
+  email: EmailInput,
+  dedupeKey: string,
+  sql: Sql = db,
+): Promise<number> {
+  return sql.run(QUEUE_EMAIL, [centreId, null, "customer", email.to, email.subject, email.text, dedupeKey]);
 }
 
-// Records an update in the workshop's Activity feed and queues any emails. Safe to call
-// more than once for the same event: repeats with the same dedupe key do nothing.
+// Queues a text with no Activity entry. Returns 0 when the number isn't an Australian mobile
+// (so the caller can fall back to email) or the text was already queued.
+export async function queueCustomerSms(centreId: number, sms: SmsInput, dedupeKey: string, sql: Sql = db): Promise<number> {
+  const mobile = sms.to ? normaliseAuMobile(sms.to) : null;
+  if (!mobile) return 0;
+  return sql.run(QUEUE_SMS, [centreId, null, mobile, sms.body, dedupeKey]);
+}
+
+// Records an update in the workshop's Activity feed and queues any emails and texts. Safe
+// to call more than once for the same event: repeats with the same dedupe key do nothing.
 export async function notify(input: NotifyInput): Promise<boolean> {
   return transaction(async (tx) => {
     const inserted = await tx.one<{ id: number }>(
@@ -65,6 +88,11 @@ export async function notify(input: NotifyInput): Promise<boolean> {
         input.customerEmail.text,
         `${input.dedupeKey}:customer`,
       ]);
+    }
+
+    const mobile = input.customerSms?.to ? normaliseAuMobile(input.customerSms.to) : null;
+    if (input.customerSms && mobile) {
+      await tx.run(QUEUE_SMS, [input.centreId, inserted.id, mobile, input.customerSms.body, `${input.dedupeKey}:sms`]);
     }
 
     return true;

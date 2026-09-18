@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { db, transaction, type InstalmentStatus } from "@/lib/db";
 import { formatAud } from "@/lib/money";
 import { notify, queueCustomerEmail } from "@/lib/notifications";
+import { bankDetailsNeededSms, paymentFailedSms, receiptEmail } from "@/lib/plan-messages";
 import { NEEDS_NEW_BANK_DETAILS, RETRY_DELAY_DAYS } from "@/lib/retry-policy";
 import { addDays, formatRetryDay, todayInSydney } from "@/lib/schedule";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -29,9 +30,11 @@ type InstalmentContext = {
   stripe_mandate_id: string | null;
   customer_name: string;
   customer_email: string;
+  customer_phone: string | null;
   stripe_customer_id: string | null;
   centre_id: number;
   centre_name: string;
+  centre_phone: string | null;
   stripe_account_id: string | null;
 };
 
@@ -40,8 +43,8 @@ const CONTEXT_SELECT = `
          i.next_retry_on, i.stripe_payment_intent_id,
          p.id AS plan_id, p.description, p.instalment_count, p.total_amount_cents, p.setup_token,
          p.stripe_payment_method_id, p.stripe_mandate_id,
-         c.full_name AS customer_name, c.email AS customer_email, c.stripe_customer_id,
-         sc.id AS centre_id, sc.name AS centre_name, sc.stripe_account_id
+         c.full_name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.stripe_customer_id,
+         sc.id AS centre_id, sc.name AS centre_name, sc.phone AS centre_phone, sc.stripe_account_id
     FROM instalments i
     JOIN payment_plans p ON p.id = i.payment_plan_id
     JOIN customers c ON c.id = p.customer_id
@@ -66,6 +69,14 @@ const asSentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() :
 const paymentLabel = (ctx: InstalmentContext) =>
   `Payment ${ctx.sequence} of ${ctx.instalment_count} (${formatAud(ctx.amount_cents)})`;
 const planLink = (ctx: InstalmentContext) => `${appUrl()}/pay/${ctx.setup_token}`;
+// What every customer message needs to know about who is asking and what for.
+const sender = (ctx: InstalmentContext) => ({
+  centreName: ctx.centre_name,
+  centrePhone: ctx.centre_phone,
+  customerName: ctx.customer_name,
+  description: ctx.description,
+  link: planLink(ctx),
+});
 
 function failureMessage(pi: Stripe.PaymentIntent): string {
   if (pi.last_payment_error?.message) return pi.last_payment_error.message;
@@ -100,6 +111,31 @@ async function markPaid(ctx: InstalmentContext, paymentIntentId: string) {
     [paymentIntentId, ctx.instalment_id],
   );
 
+  // Completed first: a plan that has just been paid off gets the "paid off" email rather
+  // than a receipt for the last payment.
+  const completed = await db.run(
+    `UPDATE payment_plans SET status = 'completed'
+      WHERE id = $1 AND status = 'active'
+        AND NOT EXISTS (SELECT 1 FROM instalments WHERE payment_plan_id = $1 AND status != 'paid')`,
+    [ctx.plan_id],
+  );
+
+  const [progress, next] = await Promise.all([
+    db.one<{ paid_cents: number }>(
+      "SELECT COALESCE(SUM(amount_cents), 0) AS paid_cents FROM instalments WHERE payment_plan_id = $1 AND status = 'paid'",
+      [ctx.plan_id],
+    ),
+    completed
+      ? Promise.resolve(undefined)
+      : db.one<{ amount_cents: number; due_date: string }>(
+          `SELECT amount_cents, due_date FROM instalments
+            WHERE payment_plan_id = $1 AND status IN ('scheduled', 'failed')
+            ORDER BY due_date, sequence
+            LIMIT 1`,
+          [ctx.plan_id],
+        ),
+  ]);
+
   await notify({
     centreId: ctx.centre_id,
     planId: ctx.plan_id,
@@ -108,14 +144,21 @@ async function markPaid(ctx: InstalmentContext, paymentIntentId: string) {
     title: `Payment received from ${ctx.customer_name}`,
     body: `${paymentLabel(ctx)} for ${ctx.description} has cleared into your Stripe account.`,
     dedupeKey: `debit_paid:${ctx.instalment_id}`,
+    customerEmail: completed
+      ? undefined
+      : {
+          to: ctx.customer_email,
+          ...receiptEmail({
+            ...sender(ctx),
+            sequence: ctx.sequence,
+            instalmentCount: ctx.instalment_count,
+            amountCents: ctx.amount_cents,
+            paidCents: progress?.paid_cents ?? ctx.amount_cents,
+            totalCents: ctx.total_amount_cents,
+            next: next ? { amountCents: next.amount_cents, dueDate: next.due_date } : null,
+          }),
+        },
   });
-
-  const completed = await db.run(
-    `UPDATE payment_plans SET status = 'completed'
-      WHERE id = $1 AND status = 'active'
-        AND NOT EXISTS (SELECT 1 FROM instalments WHERE payment_plan_id = $1 AND status != 'paid')`,
-    [ctx.plan_id],
-  );
 
   if (completed) {
     const name = firstName(ctx.customer_name);
@@ -173,6 +216,10 @@ async function markFailed(ctx: InstalmentContext, failure: Failure) {
         subject: `Please update your bank details for ${ctx.centre_name}`,
         text: `Hi ${name},\n\n${paymentLabel(ctx)} for ${ctx.description} couldn't be taken from your bank account. ${reason}\n\nYour payments are paused until you add bank details that can be debited. It only takes a minute:\n${planLink(ctx)}\n\nAny missed payment will be collected once your new details are set up.\n\n${ctx.centre_name}`,
       },
+      customerSms: {
+        to: ctx.customer_phone,
+        body: bankDetailsNeededSms({ ...sender(ctx), amountCents: ctx.amount_cents }),
+      },
     });
     return;
   }
@@ -197,6 +244,11 @@ async function markFailed(ctx: InstalmentContext, failure: Failure) {
     dedupeKey: `debit_failed:${ctx.instalment_id}`,
     emailWorkshop: true,
     customerEmail,
+    // Only the first failure is texted; later retries email the customer instead.
+    customerSms: {
+      to: ctx.customer_phone,
+      body: paymentFailedSms({ ...sender(ctx), amountCents: ctx.amount_cents, retryText: formatRetryDay(retryOn) }),
+    },
   });
   if (!toldWorkshop) {
     await queueCustomerEmail(ctx.centre_id, customerEmail, `debit_failure:${ctx.instalment_id}:${ctx.attempt_count}:customer`);

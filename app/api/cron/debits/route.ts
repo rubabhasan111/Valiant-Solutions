@@ -36,9 +36,13 @@ async function run(request: NextRequest) {
   // Schedulers with short request timeouts (cron-job.org gives up after 30 seconds) call
   // with ?background=1: the job keeps running after the 202 response, and its result is
   // recorded in job_runs, which the admin page shows.
+  // Reminders are normally held to daytime hours in Sydney; a test run with as_of sends them
+  // whatever the clock says.
+  const options = { ignoreQuietHours: Boolean(asOfParam) };
+
   if (request.nextUrl.searchParams.get("background") === "1") {
     after(() =>
-      runDebitsAndEmails(asOf, "scheduler").then(
+      runDebitsAndEmails(asOf, "scheduler", options).then(
         () => undefined,
         (err) => console.error("Scheduled debit run failed:", err),
       ),
@@ -46,8 +50,8 @@ async function run(request: NextRequest) {
     return Response.json({ accepted: true, asOf }, { status: 202 });
   }
 
-  const { debits, emails } = await runDebitsAndEmails(asOf, "scheduler");
-  return Response.json({ ...debits, emails });
+  const { debits, reminders, messages } = await runDebitsAndEmails(asOf, "scheduler", options);
+  return Response.json({ ...debits, reminders, emails: messages.emails, texts: messages.texts });
 }
 
 // Vercel Cron sends GET requests; other schedulers usually POST.

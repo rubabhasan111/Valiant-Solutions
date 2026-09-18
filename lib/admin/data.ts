@@ -15,6 +15,8 @@ export type PlatformOverview = {
   paymentsProcessing: number;
   emailsFailed: number;
   emailsSkipped: number;
+  textsFailed: number;
+  textsSkipped: number;
 };
 
 export async function getPlatformOverview(): Promise<PlatformOverview> {
@@ -30,7 +32,9 @@ export async function getPlatformOverview(): Promise<PlatformOverview> {
        (SELECT COUNT(*) FROM instalments WHERE status = 'failed') AS "paymentsRetrying",
        (SELECT COUNT(*) FROM instalments WHERE status = 'processing') AS "paymentsProcessing",
        (SELECT COUNT(*) FROM email_outbox WHERE status = 'failed') AS "emailsFailed",
-       (SELECT COUNT(*) FROM email_outbox WHERE status = 'skipped') AS "emailsSkipped"`,
+       (SELECT COUNT(*) FROM email_outbox WHERE status = 'skipped') AS "emailsSkipped",
+       (SELECT COUNT(*) FROM sms_outbox WHERE status = 'failed') AS "textsFailed",
+       (SELECT COUNT(*) FROM sms_outbox WHERE status = 'skipped') AS "textsSkipped"`,
   );
   return row!;
 }
@@ -159,6 +163,26 @@ export async function listWorkshopEmails(centreId: number, limit = 25): Promise<
   );
 }
 
+export type OutboxText = {
+  id: number;
+  recipient: string;
+  body: string;
+  status: "pending" | "sending" | "sent" | "failed" | "skipped";
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+};
+
+export async function listWorkshopTexts(centreId: number, limit = 25): Promise<OutboxText[]> {
+  return db.query<OutboxText>(
+    `SELECT id, recipient, body, status, attempts, last_error, sent_at, created_at
+       FROM sms_outbox WHERE service_centre_id = $1
+      ORDER BY id DESC LIMIT $2`,
+    [centreId, limit],
+  );
+}
+
 export type AuditEntry = {
   id: number;
   admin_name: string | null;
@@ -202,7 +226,8 @@ export type JobRun = {
   as_of: string | null;
   started_at: string;
   finished_at: string | null;
-  result: DebitRunSummary | null;
+  // Runs recorded before reminders and texts existed have fewer fields.
+  result: Partial<DebitRunSummary> | null;
   error: string | null;
 };
 

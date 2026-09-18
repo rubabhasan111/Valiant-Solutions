@@ -1,30 +1,52 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowSquareOut, CheckCircle, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOut, CheckCircle, EnvelopeSimple, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react/ssr";
 import type { Instalment } from "@/lib/db";
 import { requireWorkshop } from "@/lib/auth/dal";
 import { formatAud } from "@/lib/money";
+import { formatAuMobile } from "@/lib/phone";
+import { latestPlanLinkDeliveries, type PlanLinkDelivery } from "@/lib/plan-links";
 import { getPlanDetail } from "@/lib/plans";
-import { FREQUENCY_LABEL, formatDate } from "@/lib/schedule";
+import { FREQUENCY_LABEL, formatDate, formatTimestamp } from "@/lib/schedule";
 import { appUrl } from "@/lib/stripe";
 import { CopyField } from "@/components/dashboard/CopyField";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { InstalmentStatusChip, PlanStatusChip } from "@/components/dashboard/StatusChip";
+import { SubmitButton } from "@/components/forms/SubmitButton";
+import { resendPlanLink } from "./actions";
 
 export const metadata: Metadata = { title: "Payment plan" };
+
+const SENT_NOTICES = {
+  both: "Sent again by email and text.",
+  email: "Sent again by email. The customer has no mobile on file, so no text was sent.",
+  recent: "That link went out less than a minute ago, so it wasn't sent again.",
+  "not-needed": "This plan isn't waiting on bank details.",
+} as const;
+
+const DELIVERY_LABEL: Record<PlanLinkDelivery["status"], string> = {
+  sent: "Sent",
+  pending: "Sending",
+  sending: "Sending",
+  skipped: "Not sent yet",
+  failed: "Couldn't be sent",
+};
 
 export default async function PlanDetailPage({ params, searchParams }: PageProps<"/dashboard/plans/[id]">) {
   const { centre } = await requireWorkshop();
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, sent } = await searchParams;
 
   const detail = await getPlanDetail(centre.id, Number(id));
   if (!detail) notFound();
   const { plan, customer, instalments } = detail;
+  const deliveries = await latestPlanLinkDeliveries(plan.id);
 
   const collectedCents = instalments.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount_cents, 0);
   const setupLink = `${appUrl()}/pay/${plan.setup_token}`;
   const firstName = customer.full_name.split(" ")[0];
+  const sentNotice = typeof sent === "string" && sent in SENT_NOTICES ? SENT_NOTICES[sent as keyof typeof SENT_NOTICES] : null;
+  const waitingOnBankDetails = plan.status === "draft" || plan.status === "failed";
 
   const tiles = [
     { label: "Total", value: formatAud(plan.total_amount_cents) },
@@ -35,6 +57,40 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
       value: `${plan.instalment_count} ${FREQUENCY_LABEL[plan.frequency].toLowerCase()}`,
     },
   ];
+
+  const linkPanel = (
+    <>
+      <div className="mt-6">
+        <CopyField value={setupLink} label="Customer plan link" />
+      </div>
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="text-sm">
+          {deliveries.length === 0 ? (
+            <p className="text-mute">This link hasn&apos;t been sent yet.</p>
+          ) : (
+            <ul className="grid gap-1">
+              {deliveries.map((delivery) => (
+                <li key={delivery.channel} className="flex flex-wrap items-center gap-x-2 text-body">
+                  <span className="font-semibold text-ink">
+                    {delivery.channel === "email" ? "Emailed" : "Texted"}{" "}
+                    {delivery.channel === "email" ? delivery.recipient : formatAuMobile(delivery.recipient)}
+                  </span>
+                  <span>{DELIVERY_LABEL[delivery.status]}</span>
+                  <span className="text-mute">{formatTimestamp(delivery.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <form action={resendPlanLink.bind(null, plan.id)}>
+          <SubmitButton pendingLabel="Sending" className="btn btn-secondary">
+            <PaperPlaneTilt size={18} weight="bold" />
+            Resend to {firstName}
+          </SubmitButton>
+        </form>
+      </div>
+    </>
+  );
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-8 md:px-10 md:py-12">
@@ -52,7 +108,12 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
 
       {created === "1" && (
         <p role="status" className="mt-6 rounded-2xl bg-accent-pale px-5 py-3 text-sm font-semibold text-accent-ink">
-          Plan created. Send {firstName} the link below to add their bank details.
+          Plan created. {firstName} has been sent their link to add bank details.
+        </p>
+      )}
+      {sentNotice && (
+        <p role="status" className="mt-6 rounded-2xl bg-accent-pale px-5 py-3 text-sm font-semibold text-accent-ink">
+          {sentNotice}
         </p>
       )}
 
@@ -60,19 +121,17 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
         <section className="mt-8 rounded-3xl border border-edge bg-surface p-6 md:p-8">
           <div className="flex items-start gap-4">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-pale text-accent-ink">
-              <PaperPlaneTilt size={22} weight="duotone" />
+              <EnvelopeSimple size={22} weight="duotone" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-extrabold tracking-tight">Send {firstName} their plan link</h2>
+              <h2 className="text-xl font-extrabold tracking-tight">Waiting on {firstName}&apos;s bank details</h2>
               <p className="mt-2 max-w-[62ch] leading-relaxed text-body">
-                They&apos;ll see this schedule, then add their bank details and accept the direct debit agreement on
-                Stripe&apos;s secure page. The plan becomes active as soon as they finish.
+                They&apos;ve been sent this link by email and text. It shows the schedule, then takes them to
+                Stripe&apos;s secure page to add their bank details. The plan starts collecting as soon as they finish.
               </p>
             </div>
           </div>
-          <div className="mt-6">
-            <CopyField value={setupLink} label="Customer plan link" />
-          </div>
+          {linkPanel}
           <a
             href={setupLink}
             target="_blank"
@@ -90,8 +149,8 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
           <CheckCircle size={26} weight="fill" className="text-accent-ink" />
           <h2 className="font-bold text-accent-ink">Collecting automatically</h2>
           <p className="text-sm text-body">
-            Each payment is debited from {firstName}&apos;s bank account into your Stripe account on its due date. Failed
-            payments are retried until they&apos;re paid.
+            Each payment is debited from {firstName}&apos;s bank account into your Stripe account on its due date, and
+            they get a reminder two days before. Failed payments are retried until they&apos;re paid.
           </p>
         </section>
       )}
@@ -111,15 +170,13 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-extrabold tracking-tight">Waiting on new bank details</h2>
               <p className="mt-2 max-w-[62ch] leading-relaxed text-body">
-                {plan.failure_reason ?? "This plan can't be debited right now."} We&apos;ve emailed {firstName} a link to
-                add new bank details. The plan resumes by itself once they do, and missed payments are collected
+                {plan.failure_reason ?? "This plan can't be debited right now."} {firstName} has been sent a link to add
+                new bank details. The plan resumes by itself once they do, and missed payments are collected
                 automatically.
               </p>
             </div>
           </div>
-          <div className="mt-6">
-            <CopyField value={setupLink} label="Customer plan link" />
-          </div>
+          {linkPanel}
         </section>
       )}
 
@@ -173,14 +230,21 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
               <dd className="break-all font-semibold">{customer.email}</dd>
             </div>
             <div>
-              <dt className="text-mute">Phone</dt>
-              <dd className="font-semibold">{customer.phone ?? "Not recorded"}</dd>
+              <dt className="text-mute">Mobile</dt>
+              <dd className="font-semibold">
+                {customer.phone ? formatAuMobile(customer.phone) : "Not recorded, so reminders go by email"}
+              </dd>
             </div>
             <div>
               <dt className="text-mute">Vehicle rego</dt>
               <dd className="font-semibold">{customer.vehicle_rego ?? "Not recorded"}</dd>
             </div>
           </dl>
+          {!waitingOnBankDetails && (
+            <p className="mt-4 text-xs leading-relaxed text-mute">
+              Reminders are sent two days before each payment, and {firstName} gets a receipt each time one clears.
+            </p>
+          )}
         </section>
       </div>
     </main>
@@ -208,7 +272,7 @@ function InstalmentStatus({
           {note(
             planPaused
               ? `Waiting for ${firstName}'s new bank details.`
-              : `Retrying automatically until it's paid. ${firstName} has been emailed.`,
+              : `Retrying automatically until it's paid. ${firstName} has been told.`,
           )}
         </>
       )}

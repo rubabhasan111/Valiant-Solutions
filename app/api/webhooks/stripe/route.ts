@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { after } from "next/server";
-import { deliverPendingEmails } from "@/lib/email";
+import { deliverPendingMessages } from "@/lib/messaging";
 import { forgetEvent, handleStripeEvent, recordEvent } from "@/lib/stripe-events";
 import { getStripe } from "@/lib/stripe";
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Event handling failed." }, { status: 500 });
   }
 
-  // Send any emails the event queued, after Stripe has its response.
-  after(() => deliverPendingEmails());
+  // Send any emails and texts the event queued, after Stripe has its response.
+  after(() => deliverPendingMessages());
   return Response.json({ received: true });
 }

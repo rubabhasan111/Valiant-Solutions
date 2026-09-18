@@ -31,7 +31,17 @@ export function CustomerForm() {
         error={errors?.email}
       />
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="phone" type="tel" label="Phone" optional autoComplete="off" defaultValue={values?.phone} />
+        <Field
+          id="phone"
+          type="tel"
+          label="Mobile"
+          hint="Payment reminders are texted here."
+          placeholder="0412 345 678"
+          autoComplete="off"
+          required
+          defaultValue={values?.phone}
+          error={errors?.phone}
+        />
         <Field
           id="vehicleRego"
           label="Vehicle rego"
