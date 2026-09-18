@@ -24,6 +24,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             Halfshaft admin
           </Link>
           <div className="flex items-center gap-5">
+            <Link href="/admin/team" className="text-sm font-semibold text-body transition-colors hover:text-ink">
+              Team
+            </Link>
             <p className="hidden truncate text-sm text-body sm:block">{admin.name}</p>
             <form action={adminLogout}>
               <button

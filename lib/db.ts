@@ -366,8 +366,24 @@ CREATE TABLE customer_login_codes (
 CREATE INDEX idx_customer_login_codes_email ON customer_login_codes (email, created_at);
 `;
 
+// Invitations for more Halfshaft staff. The invited person sets their own password, so
+// nobody has to send one around.
+const SCHEMA_V5 = `
+CREATE TABLE admin_invites (
+  token_hash text PRIMARY KEY,
+  email      text NOT NULL,
+  name       text NOT NULL,
+  invited_by integer REFERENCES admins(id) ON DELETE SET NULL,
+  expires_at timestamptz NOT NULL,
+  used_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_admin_invites_email ON admin_invites (email, created_at);
+`;
+
 // Applied in order, once each. Never edit a migration that has shipped; add a new one.
-const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
+const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
 
 // The start of the current month in Sydney, for "this month" totals.
 export const SYDNEY_MONTH_START =

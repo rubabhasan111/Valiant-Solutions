@@ -15,7 +15,9 @@ export function proxy(request: NextRequest) {
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     // The setup page guards itself: it needs the setup key and closes once an admin exists.
-    const openToEveryone = pathname === "/admin/login" || pathname === "/admin/setup";
+    // Invite links carry their own single-use token.
+    const openToEveryone =
+      pathname === "/admin/login" || pathname === "/admin/setup" || pathname.startsWith("/admin/invite/");
     if (openToEveryone || request.cookies.has(ADMIN_SESSION_COOKIE)) return NextResponse.next();
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
