@@ -114,9 +114,16 @@ export async function databaseInfo(): Promise<DatabaseInfo> {
     `SELECT ${counted.map((table) => `(SELECT COUNT(*) FROM ${table}) AS "${table}"`).join(", ")}`,
   );
 
+  // Same order as lib/db.ts, and an empty variable counts as unset there too.
+  const connectionString = [
+    process.env.DATABASE_URL,
+    process.env.DATABASE_URL_POSTGRES_URL,
+    process.env.POSTGRES_URL,
+  ].find((value) => value && value.trim().length > 0);
+
   let host = "unknown";
   try {
-    host = new URL(process.env.DATABASE_URL ?? process.env.DATABASE_URL_POSTGRES_URL ?? "postgres://unknown").host;
+    host = new URL(connectionString ?? "postgres://unknown").host;
   } catch {
     // An unparsable connection string still shouldn't break the page.
   }
