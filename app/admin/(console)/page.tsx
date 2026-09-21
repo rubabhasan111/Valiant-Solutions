@@ -23,6 +23,8 @@ const AUDIT_LABEL: Record<string, string> = {
   workshop_restored: "Restored access",
   bank_link_resent: "Resent a bank details link",
   debit_job_run: "Ran the debit job",
+  alert_phone_changed: "Changed their alert mobile",
+  alert_test_sent: "Sent a test alert",
 };
 
 function minutesSince(iso: string): number {

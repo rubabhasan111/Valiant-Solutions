@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { CheckCircle, Warning, XCircle } from "@phosphor-icons/react/ssr";
 import { requireAdmin } from "@/lib/admin/dal";
+import { listOpenAlerts } from "@/lib/alerts";
+import { formatAuMobile } from "@/lib/phone";
+import { SubmitButton } from "@/components/forms/SubmitButton";
+import { saveAlertPhone, sendTestAlert } from "./actions";
 import { listDebitJobRuns } from "@/lib/admin/data";
 import {
   configChecks,
@@ -62,16 +66,30 @@ function Rows({ rows }: { rows: [string, string][] }) {
 
 const minutesSince = (iso: string) => Math.round((Date.now() - Date.parse(iso)) / 60_000);
 
-export default async function SystemPage() {
-  await requireAdmin();
+const ALERT_NOTICES = {
+  saved: ["bg-accent-pale text-accent-ink", "Saved. Alerts will be texted to this mobile."],
+  removed: ["bg-edge/60 text-body", "Text alerts turned off for you."],
+  invalid: ["bg-danger-pale text-danger", "That isn't an Australian mobile number."],
+  tested: ["bg-accent-pale text-accent-ink", "Test alert sent to every admin with a mobile set."],
+  "no-phones": ["bg-pending-pale text-pending", "No admin has an alert mobile yet, so nothing was texted."],
+} as const;
+
+export default async function SystemPage({ searchParams }: PageProps<"/admin/system">) {
+  const admin = await requireAdmin();
+  const { alerts: alertsParam } = await searchParams;
+  const alertNotice =
+    typeof alertsParam === "string" && alertsParam in ALERT_NOTICES
+      ? ALERT_NOTICES[alertsParam as keyof typeof ALERT_NOTICES]
+      : null;
 
   const deployment = deploymentInfo();
-  const [database, queues, stuck, stripe, runs] = await Promise.all([
+  const [database, queues, stuck, stripe, runs, openAlerts] = await Promise.all([
     databaseInfo(),
     queueInfo(),
     stuckWork(),
     stripeInfo(),
     listDebitJobRuns(8),
+    listOpenAlerts(),
   ]);
 
   const lastRun = runs[0];
@@ -81,7 +99,72 @@ export default async function SystemPage() {
     <main className="mx-auto w-full max-w-6xl px-5 py-8 md:px-10 md:py-12">
       <PageHeader title="System" description="What's running, what it's wired to, and what's stuck. For you, not for workshops." />
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+      <section className="mt-8 rounded-3xl border border-edge bg-surface p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold">Alerts</h2>
+            <p className="mt-1 max-w-[62ch] text-sm text-body">
+              You&apos;re texted when the debit job fails or stops, payments get stuck, customer texts fail, SMS credit
+              runs low, or a workshop can&apos;t take debits. Again each day while it lasts, and once when it clears.
+            </p>
+          </div>
+          <form action={sendTestAlert}>
+            <SubmitButton pendingLabel="Sending" className="btn btn-secondary">
+              Send a test alert
+            </SubmitButton>
+          </form>
+        </div>
+
+        {alertNotice && (
+          <p role="status" className={`mt-4 rounded-2xl px-4 py-3 text-sm font-semibold ${alertNotice[0]}`}>
+            {alertNotice[1]}
+          </p>
+        )}
+
+        {openAlerts.length === 0 ? (
+          <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-accent-ink">
+            <CheckCircle size={20} weight="fill" /> Nothing needs a look right now.
+          </p>
+        ) : (
+          <ul className="mt-4 grid gap-2">
+            {openAlerts.map((alert) => (
+              <li key={alert.key} className="rounded-2xl bg-danger-pale px-4 py-3 text-sm">
+                <p className="font-bold text-danger">{alert.title}</p>
+                <p className="mt-0.5 text-body">{alert.detail}</p>
+                <p className="mt-1 text-xs text-mute">Since {formatTimestamp(alert.opened_at)}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form action={saveAlertPhone} className="mt-5 flex flex-wrap items-end gap-3 border-t border-edge pt-4">
+          <div className="grid gap-2">
+            <label htmlFor="alertPhone" className="text-sm font-semibold">
+              Text my alerts to
+            </label>
+            <input
+              id="alertPhone"
+              name="alertPhone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="04xx xxx xxx"
+              defaultValue={admin.alert_phone ? formatAuMobile(admin.alert_phone) : ""}
+              className="field w-56"
+            />
+          </div>
+          <SubmitButton pendingLabel="Saving" className="btn btn-secondary">
+            Save
+          </SubmitButton>
+          <p className="basis-full text-xs text-mute">
+            {admin.alert_phone
+              ? "Leave it empty and save to stop text alerts. Alerts are also emailed once email is set up."
+              : "Not set, so you won't be texted. Each admin sets their own."}
+          </p>
+        </form>
+      </section>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Panel title="Deployment">
           <Rows
             rows={[
@@ -221,7 +304,7 @@ export default async function SystemPage() {
           {[
             { label: "Payments stuck over a day", value: stuck.processingOverADay, bad: stuck.processingOverADay > 0 },
             { label: "Failed payments retrying", value: stuck.failedInstalments, bad: false },
-            { label: "Plans paused", value: stuck.pausedPlans, bad: false },
+            { label: "Plans needing bank details", value: stuck.pausedPlans, bad: false },
             { label: "Plans unstarted over a week", value: stuck.draftPlansOverAWeek, bad: false },
           ].map((item) => (
             <div key={item.label}>

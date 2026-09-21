@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Bank, CheckCircle, ShieldCheck, Signature, WarningCircle } from "@phosphor-icons/react/ssr";
 import { formatAud } from "@/lib/money";
@@ -172,6 +173,16 @@ export default async function CustomerPlanPage({ params, searchParams }: PagePro
           ))}
         </ol>
       </section>
+
+      <p className="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm text-mute">
+        <span>Direct debits are processed by Stripe.</span>
+        <Link href="/terms" className="underline-offset-2 hover:text-ink hover:underline">
+          Terms
+        </Link>
+        <Link href="/privacy" className="underline-offset-2 hover:text-ink hover:underline">
+          Privacy
+        </Link>
+      </p>
     </main>
   );
 }

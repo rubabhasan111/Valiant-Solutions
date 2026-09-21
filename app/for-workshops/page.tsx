@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   ArrowsClockwise,
   Bank,
@@ -176,6 +177,14 @@ export default function ForWorkshopsPage() {
       <footer className="mt-10 border-t border-edge pt-6 text-sm text-mute">
         <p>Halfshaft is a product of Valiant Solutions. Payments are processed by Stripe.</p>
         <p className="mt-1">Direct debits are taken under a Direct Debit Request signed by your customer.</p>
+        <p className="mt-3 flex gap-4">
+          <Link href="/terms" className="underline-offset-2 hover:text-ink hover:underline">
+              Terms
+            </Link>
+            <Link href="/privacy" className="underline-offset-2 hover:text-ink hover:underline">
+              Privacy
+            </Link>
+        </p>
       </footer>
     </main>
   );

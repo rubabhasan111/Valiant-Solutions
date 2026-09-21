@@ -70,7 +70,10 @@ export function tooManyAttemptsMessage(retryAfterMinutes: number): string {
   return `Too many attempts. Try again in ${wait}.`;
 }
 
-// Keeps the table small; old rows are past every window.
+// Keeps the tables small, and keeps the promise in the privacy policy that sign-in records
+// and codes are deleted within a day. Old rows are past every window.
 export async function purgeOldAuthAttempts(): Promise<number> {
-  return db.run("DELETE FROM auth_attempts WHERE created_at < now() - interval '1 day'");
+  const attempts = await db.run("DELETE FROM auth_attempts WHERE created_at < now() - interval '1 day'");
+  const codes = await db.run("DELETE FROM customer_login_codes WHERE created_at < now() - interval '1 day'");
+  return attempts + codes;
 }

@@ -75,7 +75,15 @@ export function SignupForm() {
       </button>
 
       <p className="text-xs leading-relaxed text-mute">
-        Next, Stripe verifies your business. Stripe test mode: no real money moves and no real identity checks are made.
+        By creating an account you agree to the{" "}
+        <Link href="/terms" className="font-semibold text-ink underline underline-offset-2">
+          terms of use
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="font-semibold text-ink underline underline-offset-2">
+          privacy policy
+        </Link>
+        . Next, Stripe verifies your business. Stripe test mode: no real money moves and no real identity checks are made.
       </p>
     </form>
   );

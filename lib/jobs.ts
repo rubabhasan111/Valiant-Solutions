@@ -1,3 +1,4 @@
+import { checkAlerts, smsCreditBalance } from "@/lib/alerts";
 import { purgeOldAuthAttempts } from "@/lib/auth/rate-limit";
 import { db } from "@/lib/db";
 import { runDebitJob, type DebitJobResult } from "@/lib/debits";
@@ -60,6 +61,7 @@ export async function runDebitsAndEmails(asOf: string, trigger: JobTrigger, opti
     const messages = await deliverPendingMessages();
     const summary = summariseDebitRun(debits, reminders, messages, resumedPlans);
     await db.run("UPDATE job_runs SET finished_at = now(), result = $1 WHERE id = $2", [JSON.stringify(summary), run!.id]);
+    await raiseAlerts();
     return { debits, reminders, messages, summary };
   } catch (err) {
     await db
@@ -68,6 +70,20 @@ export async function runDebitsAndEmails(asOf: string, trigger: JobTrigger, opti
         run!.id,
       ])
       .catch(() => {});
+    await raiseAlerts();
     throw err;
+  }
+}
+
+// Tells admins about anything that needs a person. Runs after the job's own work, and never
+// makes the job fail: an alert that can't be sent is picked up on the next run.
+export async function raiseAlerts() {
+  try {
+    const alerts = await checkAlerts({ smsBalance: await smsCreditBalance() });
+    if (alerts.opened.length + alerts.reminded.length + alerts.resolved.length > 0) await deliverPendingMessages();
+    return alerts;
+  } catch (err) {
+    console.error("Checking alerts failed:", err);
+    return null;
   }
 }

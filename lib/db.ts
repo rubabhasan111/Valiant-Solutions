@@ -419,8 +419,26 @@ ALTER TABLE instalments
 CREATE INDEX idx_plans_resume_on ON payment_plans (resume_on) WHERE status = 'paused';
 `;
 
+// Alerts to Halfshaft's own admins when something needs a person: the job failing, payments
+// stuck, texts failing, SMS credit running low. One row per kind of problem; it's reopened
+// if the problem comes back after being resolved.
+const SCHEMA_V7 = `
+ALTER TABLE admins ADD COLUMN alert_phone text;
+
+CREATE TABLE system_alerts (
+  key              text PRIMARY KEY,
+  title            text NOT NULL,
+  detail           text NOT NULL,
+  -- Counts how many times this alert has opened, so each opening gets its own messages.
+  occurrence       integer NOT NULL DEFAULT 1,
+  opened_at        timestamptz NOT NULL DEFAULT now(),
+  last_notified_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at      timestamptz
+);
+`;
+
 // Applied in order, once each. Never edit a migration that has shipped; add a new one.
-const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6];
+const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7];
 
 // The start of the current month in Sydney, for "this month" totals.
 export const SYDNEY_MONTH_START =
