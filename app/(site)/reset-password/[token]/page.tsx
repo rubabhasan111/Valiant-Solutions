@@ -25,7 +25,7 @@ export default async function ResetPasswordPage({ params }: PageProps<"/reset-pa
       ) : (
         <>
           <p className="mt-4 text-lg leading-relaxed text-body">
-            Reset links work once and expire after an hour. Ask for a new one and it&apos;ll be emailed straight away.
+            Reset links work once and expire after an hour (a day for links from Halfshaft support). Ask for a new one and it&apos;ll be emailed straight away.
           </p>
           <Link href="/forgot-password" className="btn btn-primary mt-8">
             Send a new link

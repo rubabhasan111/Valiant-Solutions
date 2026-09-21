@@ -26,24 +26,60 @@ export async function requestPasswordReset(email: string): Promise<void> {
   );
   if ((recent?.n ?? 0) >= MAX_LINKS_PER_HOUR) return;
 
+  await issueResetLink(user, LINK_VALID_MINUTES, "Someone asked to reset the password for your Halfshaft login.");
+}
+
+// For a workshop that's locked out and can't receive email: a Halfshaft admin creates the
+// link and passes it on. It lasts a day rather than an hour, since it goes through a person.
+export const ADMIN_LINK_VALID_HOURS = 24;
+
+export async function createAdminResetLink(
+  centreId: number,
+  userId: number,
+): Promise<{ link: string; name: string; email: string } | null> {
+  if (!Number.isInteger(userId)) return null;
+  const user = await db.one<{ id: number; name: string; email: string }>(
+    `SELECT u.id, u.name, u.email FROM users u
+       JOIN memberships m ON m.user_id = u.id
+      WHERE u.id = $1 AND m.service_centre_id = $2`,
+    [userId, centreId],
+  );
+  if (!user) return null;
+  const link = await issueResetLink(
+    user,
+    ADMIN_LINK_VALID_HOURS * 60,
+    "Halfshaft support made you a link to reset the password for your Halfshaft login.",
+  );
+  return { link, name: user.name, email: user.email };
+}
+
+// Stores the link's hash, emails the link, and returns it.
+async function issueResetLink(
+  user: { id: number; name: string; email: string },
+  validMinutes: number,
+  opening: string,
+): Promise<string> {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashSessionToken(token);
+  const link = `${appUrl()}/reset-password/${token}`;
   await db.run(
     "INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(mins => $3))",
-    [tokenHash, user.id, LINK_VALID_MINUTES],
+    [tokenHash, user.id, validMinutes],
   );
 
   const name = user.name.trim().split(/\s+/)[0];
+  const lasts = validMinutes >= 120 ? `${Math.round(validMinutes / 60)} hours` : `${validMinutes} minutes`;
   await db.run(
     `INSERT INTO email_outbox (service_centre_id, notification_id, audience, recipient, subject, text_body, dedupe_key)
      VALUES (NULL, NULL, 'workshop', $1, $2, $3, $4)`,
     [
       user.email,
       "Reset your Halfshaft password",
-      `Hi ${name},\n\nSomeone asked to reset the password for your Halfshaft login. Choose a new one here:\n${appUrl()}/reset-password/${token}\n\nThe link works once and expires in ${LINK_VALID_MINUTES} minutes. If this wasn't you, ignore this email and your password stays as it is.\n\nHalfshaft`,
+      `Hi ${name},\n\n${opening} Choose a new one here:\n${link}\n\nThe link works once and expires in ${lasts}. If this wasn't you, ignore this email and your password stays as it is.\n\nHalfshaft`,
       `password_reset:${tokenHash.slice(0, 24)}`,
     ],
   );
+  return link;
 }
 
 export async function resetTokenIsValid(token: string): Promise<boolean> {

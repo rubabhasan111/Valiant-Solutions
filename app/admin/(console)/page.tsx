@@ -25,6 +25,7 @@ const AUDIT_LABEL: Record<string, string> = {
   debit_job_run: "Ran the debit job",
   alert_phone_changed: "Changed their alert mobile",
   alert_test_sent: "Sent a test alert",
+  password_reset_link_created: "Made a password reset link",
 };
 
 function minutesSince(iso: string): number {

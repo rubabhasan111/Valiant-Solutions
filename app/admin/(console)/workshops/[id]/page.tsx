@@ -20,6 +20,7 @@ import { WorkshopStatusChips } from "@/components/admin/StripeStatusChip";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { PlanStatusChip } from "@/components/dashboard/StatusChip";
 import { SubmitButton } from "@/components/forms/SubmitButton";
+import { ResetLinkButton } from "./ResetLinkButton";
 import { resendBankLink, restoreWorkshop, suspendWorkshop } from "../../actions";
 
 export const metadata: Metadata = { title: "Workshop" };
@@ -169,6 +170,9 @@ export default async function AdminWorkshopPage({ params, searchParams }: PagePr
                 <th scope="col" className="px-5 py-3 font-semibold">Name</th>
                 <th scope="col" className="px-5 py-3 font-semibold">Role</th>
                 <th scope="col" className="px-5 py-3 font-semibold">Last login</th>
+                <th scope="col" className="px-5 py-3">
+                  <span className="sr-only">Password</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-edge border-t border-edge">
@@ -182,11 +186,14 @@ export default async function AdminWorkshopPage({ params, searchParams }: PagePr
                   <td className="tabular px-5 py-3 text-body">
                     {member.last_login_at ? formatTimestamp(member.last_login_at) : "No active session"}
                   </td>
+                  <td className="px-5 py-3 text-right align-top">
+                    <ResetLinkButton centreId={centre.id} userId={member.id} name={member.name} />
+                  </td>
                 </tr>
               ))}
               {members.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-5 py-3 text-body">No staff logins.</td>
+                  <td colSpan={4} className="px-5 py-3 text-body">No staff logins.</td>
                 </tr>
               )}
             </tbody>

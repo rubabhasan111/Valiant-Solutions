@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowsLeftRight, Bank, Bell, Receipt, SquaresFour, UsersThree, type Icon } from "@phosphor-icons/react";
+import { ArrowsLeftRight, Bank, Bell, GearSix, Receipt, SquaresFour, UsersThree, type Icon } from "@phosphor-icons/react";
 
 type NavItem = { label: string; Icon: Icon; href: string; badge?: number };
 
@@ -16,6 +16,7 @@ export function DashboardNav({ unread }: { unread: number }) {
     { label: "Payouts", href: "/dashboard/payouts", Icon: Bank },
     { label: "Transactions", href: "/dashboard/transactions", Icon: ArrowsLeftRight },
     { label: "Activity", href: "/dashboard/activity", Icon: Bell, badge: unread },
+    { label: "Settings", href: "/dashboard/settings", Icon: GearSix },
   ];
 
   return (

@@ -437,8 +437,24 @@ CREATE TABLE system_alerts (
 );
 `;
 
+// Workshop owners invite their staff with a one-time link, like admin invites.
+const SCHEMA_V8 = `
+CREATE TABLE workshop_invites (
+  token_hash        text PRIMARY KEY,
+  service_centre_id integer NOT NULL REFERENCES service_centres(id) ON DELETE CASCADE,
+  email             text NOT NULL,
+  name              text NOT NULL,
+  invited_by        integer REFERENCES users(id) ON DELETE SET NULL,
+  expires_at        timestamptz NOT NULL,
+  used_at           timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_workshop_invites_centre ON workshop_invites (service_centre_id, created_at);
+`;
+
 // Applied in order, once each. Never edit a migration that has shipped; add a new one.
-const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7];
+const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8];
 
 // The start of the current month in Sydney, for "this month" totals.
 export const SYDNEY_MONTH_START =

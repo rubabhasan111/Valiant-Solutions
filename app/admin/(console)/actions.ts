@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/dal";
+import { createAdminResetLink } from "@/lib/auth/password-reset";
 import { getPlanForAdmin, recordAudit } from "@/lib/admin/data";
 import { destroyAdminSession } from "@/lib/admin/session";
 import { db, transaction } from "@/lib/db";
@@ -100,4 +101,22 @@ export async function runDebitsNow() {
 export async function adminLogout() {
   await destroyAdminSession();
   redirect("/admin/login");
+}
+
+export type ResetLinkState = { error?: string; link?: string; name?: string } | undefined;
+
+// For a workshop login that's locked out while email isn't sending: makes a one-time reset
+// link for the admin to pass on (also emailed). Shown once; only its hash is stored.
+export async function createWorkshopResetLink(
+  centreId: number,
+  userId: number,
+): Promise<ResetLinkState> {
+  const admin = await requireAdmin();
+  if (!Number.isInteger(centreId)) return { error: "That workshop couldn't be found." };
+  const result = await createAdminResetLink(centreId, userId);
+  if (!result) return { error: "That login couldn't be found." };
+
+  await recordAudit(admin.id, "password_reset_link_created", { centreId, detail: `${result.name} (${result.email})` });
+  await deliverPendingMessages();
+  return { link: result.link, name: result.name };
 }
