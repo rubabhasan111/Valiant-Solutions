@@ -15,7 +15,7 @@ import { formatAud } from "@/lib/money";
 import { formatAuMobile } from "@/lib/phone";
 import { listPlans } from "@/lib/plans";
 import { formatDate, formatRetryDay, formatTimestamp } from "@/lib/schedule";
-import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ConfirmButton } from "@/components/forms/ConfirmButton";
 import { WorkshopStatusChips } from "@/components/admin/StripeStatusChip";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { PlanStatusChip } from "@/components/dashboard/StatusChip";

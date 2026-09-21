@@ -38,6 +38,13 @@ export function isIsoDate(value: string): boolean {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
+// Whole days from one calendar date to another; negative if `to` is earlier.
+export function daysBetween(from: string, to: string): number {
+  const a = dateParts(from);
+  const b = dateParts(to);
+  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
+}
+
 export function addDays(iso: string, days: number): string {
   const { y, m, d } = dateParts(iso);
   return toIso(new Date(Date.UTC(y, m - 1, d + days)));

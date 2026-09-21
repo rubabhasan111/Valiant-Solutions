@@ -8,9 +8,10 @@ const DANGER = "bg-danger-pale text-danger";
 const PLAN: Record<PlanStatus, [label: string, className: string]> = {
   draft: ["Awaiting bank details", PENDING],
   active: ["Active", ACTIVE],
+  paused: ["On hold", PENDING],
   completed: ["Paid off", NEUTRAL],
   cancelled: ["Cancelled", NEUTRAL],
-  failed: ["Paused", DANGER],
+  failed: ["Needs bank details", DANGER],
 };
 
 const INSTALMENT: Record<InstalmentStatus, [label: string, className: string]> = {
@@ -18,6 +19,7 @@ const INSTALMENT: Record<InstalmentStatus, [label: string, className: string]> =
   processing: ["Processing", PENDING],
   paid: ["Paid", ACTIVE],
   failed: ["Failed", DANGER],
+  cancelled: ["Not collected", NEUTRAL],
 };
 
 function Chip({ label, className }: { label: string; className: string }) {

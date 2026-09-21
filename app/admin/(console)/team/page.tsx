@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/admin/dal";
 import { listAdmins, listPendingInvites } from "@/lib/admin/invites";
 import { formatDate, formatTimestamp } from "@/lib/schedule";
-import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ConfirmButton } from "@/components/forms/ConfirmButton";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { SubmitButton } from "@/components/forms/SubmitButton";
 import { InviteForm } from "./InviteForm";

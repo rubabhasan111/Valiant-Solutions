@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/admin/dal";
 import { getPlatformOverview, listAuditLog, listDebitJobRuns, listWorkshops, type JobRun } from "@/lib/admin/data";
 import { formatAud } from "@/lib/money";
 import { formatDate, formatTimestamp } from "@/lib/schedule";
-import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { ConfirmButton } from "@/components/forms/ConfirmButton";
 import { WorkshopStatusChips } from "@/components/admin/StripeStatusChip";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { runDebitsNow } from "./actions";

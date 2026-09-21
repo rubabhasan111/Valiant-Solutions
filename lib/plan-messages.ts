@@ -149,6 +149,50 @@ export function bankDetailsNeededSms(input: Sender & { amountCents: number }): s
   return `${input.centreName}: your payment of ${formatAud(input.amountCents)} for ${input.description} couldn't be taken from your bank account. Please add new bank details so your plan can continue: ${input.link}`;
 }
 
+export function paidOffEmail(input: Sender & { instalmentCount: number; totalCents: number; final: string }): EmailContent {
+  return {
+    subject: `Your ${input.centreName} plan is paid off`,
+    text: `Hi ${firstName(input.customerName)},\n\n${input.final} All ${input.instalmentCount} payments (${formatAud(input.totalCents)}) for ${input.description} are complete, and no more debits will be taken.\n\n${signOff(input)}`,
+  };
+}
+
+// The workshop put the plan on hold, e.g. for hardship or while a dispute is sorted out.
+export function planOnHoldMessages(input: Sender & { resumeOn: string | null }): { email: EmailContent; sms: string } {
+  const until = input.resumeOn
+    ? `until ${formatDate(input.resumeOn)}, when they'll start again`
+    : `until ${input.centreName} starts them again`;
+  return {
+    sms: `${input.centreName}: your payments for ${input.description} are on hold. Nothing will be debited ${input.resumeOn ? `until ${formatShortDay(input.resumeOn)}` : "until we let you know"}.${smsQuestions(input)}`,
+    email: {
+      subject: `Your payments to ${input.centreName} are on hold`,
+      text: `Hi ${firstName(input.customerName)},\n\nYour payments for ${input.description} are on hold. Nothing will be debited from your bank account ${until}, and your remaining payment dates will move back by the time the plan was on hold.\n\nView your plan: ${input.link}\n\n${signOff(input)}`,
+    },
+  };
+}
+
+export function planHoldEndedMessages(
+  input: Sender & { next: { amountCents: number; dueDate: string } | null },
+): { email: EmailContent; sms: string } {
+  const next = input.next ? `Your next payment of ${formatAud(input.next.amountCents)} is due on ${formatDate(input.next.dueDate)}.` : "";
+  return {
+    sms: `${input.centreName}: your payments for ${input.description} have started again.${input.next ? ` Next payment: ${formatAud(input.next.amountCents)} on ${formatShortDay(input.next.dueDate)}.` : ""}${smsQuestions(input)}`,
+    email: {
+      subject: `Your payments to ${input.centreName} have started again`,
+      text: `Hi ${firstName(input.customerName)},\n\nYour plan for ${input.description} is no longer on hold, and payments will be debited on their due dates again. ${next}\n\nView your plan: ${input.link}\n\n${signOff(input)}`,
+    },
+  };
+}
+
+export function planCancelledMessages(input: Sender): { email: EmailContent; sms: string } {
+  return {
+    sms: `${input.centreName}: your repayment plan for ${input.description} has been cancelled. No more payments will be debited.${smsQuestions(input)}`,
+    email: {
+      subject: `Your repayment plan with ${input.centreName} has been cancelled`,
+      text: `Hi ${firstName(input.customerName)},\n\nYour repayment plan for ${input.description} has been cancelled, and no more payments will be debited from your bank account.\n\n${signOff(input)}`,
+    },
+  };
+}
+
 export function directDebitCancelledSms(input: Sender): string {
   return `${input.centreName}: your direct debit for ${input.description} was cancelled, so your remaining payments are on hold. To set it up again: ${input.link}`;
 }

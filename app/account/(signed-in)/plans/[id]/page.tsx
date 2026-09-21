@@ -57,6 +57,15 @@ export default async function CustomerPlanPage({ params }: PageProps<"/account/p
         </section>
       )}
 
+      {plan.status === "paused" && (
+        <section className="mt-8 rounded-3xl bg-pending-pale px-6 py-5">
+          <p className="leading-relaxed text-ink">
+            {plan.centre_name} has put this plan on hold, so nothing is being debited. Your remaining payment dates move
+            back by the time it&apos;s on hold, and you&apos;ll hear from us when payments start again.
+          </p>
+        </section>
+      )}
+
       <section aria-label="Totals" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Total", value: formatAud(plan.total_amount_cents) },

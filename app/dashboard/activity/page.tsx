@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowsClockwise, Bell, CheckCircle, Clock, WarningCircle } from "@phosphor-icons/react/ssr";
+import { ArrowsClockwise, Bell, CheckCircle, Clock, HandCoins, PauseCircle, WarningCircle, XCircle } from "@phosphor-icons/react/ssr";
 import type { NotificationKind } from "@/lib/db";
 import { requireWorkshop } from "@/lib/auth/dal";
 import { listNotifications } from "@/lib/notifications";
@@ -21,6 +21,10 @@ const KIND_STYLE: Record<NotificationKind, { Icon: typeof CheckCircle; className
   bank_details_needed: { Icon: WarningCircle, className: "text-danger" },
   bank_details_updated: { Icon: ArrowsClockwise, className: "text-accent-ink" },
   plan_completed: { Icon: CheckCircle, className: "text-accent-ink" },
+  plan_paused: { Icon: PauseCircle, className: "text-pending" },
+  plan_resumed: { Icon: ArrowsClockwise, className: "text-accent-ink" },
+  plan_cancelled: { Icon: XCircle, className: "text-mute" },
+  payment_recorded: { Icon: HandCoins, className: "text-accent-ink" },
 };
 
 export default async function ActivityPage() {

@@ -2,6 +2,7 @@ import { purgeOldAuthAttempts } from "@/lib/auth/rate-limit";
 import { db } from "@/lib/db";
 import { runDebitJob, type DebitJobResult } from "@/lib/debits";
 import { deliverPendingMessages, type MessageDeliveryResult } from "@/lib/messaging";
+import { autoResumeDuePlans } from "@/lib/plan-actions";
 import { sendPaymentReminders, type ReminderResult } from "@/lib/reminders";
 
 export type JobTrigger = "scheduler" | "admin";
@@ -14,6 +15,7 @@ export type DebitRunSummary = {
   skipped: number;
   settledFromStripe: number;
   releasedClaims: number;
+  resumedPlans: number;
   reminders: ReminderResult;
   emails: MessageDeliveryResult["emails"];
   texts: MessageDeliveryResult["texts"];
@@ -23,6 +25,7 @@ export function summariseDebitRun(
   debits: DebitJobResult,
   reminders: ReminderResult,
   messages: MessageDeliveryResult,
+  resumedPlans = 0,
 ): DebitRunSummary {
   const count = (result: string) => debits.outcomes.filter((o) => o.result === result).length;
   return {
@@ -33,6 +36,7 @@ export function summariseDebitRun(
     skipped: count("skipped"),
     settledFromStripe: debits.settledFromStripe,
     releasedClaims: debits.releasedClaims,
+    resumedPlans,
     reminders,
     emails: messages.emails,
     texts: messages.texts,
@@ -48,11 +52,13 @@ export async function runDebitsAndEmails(asOf: string, trigger: JobTrigger, opti
   );
 
   try {
+    // Holds that end today first, so their first payment can be collected in this run.
+    const resumedPlans = await autoResumeDuePlans(asOf);
     const debits = await runDebitJob(asOf);
     const reminders = await sendPaymentReminders(asOf, { ignoreQuietHours: options.ignoreQuietHours });
     await purgeOldAuthAttempts();
     const messages = await deliverPendingMessages();
-    const summary = summariseDebitRun(debits, reminders, messages);
+    const summary = summariseDebitRun(debits, reminders, messages, resumedPlans);
     await db.run("UPDATE job_runs SET finished_at = now(), result = $1 WHERE id = $2", [JSON.stringify(summary), run!.id]);
     return { debits, reminders, messages, summary };
   } catch (err) {

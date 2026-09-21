@@ -30,9 +30,10 @@ export type Customer = {
   created_at: string;
 };
 
-// "draft": waiting for the customer's bank details. "failed": debits are paused until
-// the customer adds bank details that can be debited.
-export type PlanStatus = "draft" | "active" | "completed" | "cancelled" | "failed";
+// "draft": waiting for the customer's bank details. "paused": the workshop put the plan on
+// hold (hardship, a dispute). "failed": debits stopped because the customer's bank account
+// can't be debited, until they add new details.
+export type PlanStatus = "draft" | "active" | "paused" | "completed" | "cancelled" | "failed";
 
 export type PaymentPlan = {
   id: number;
@@ -51,10 +52,17 @@ export type PaymentPlan = {
   checkout_session_id: string | null;
   activated_at: string | null;
   failure_reason: string | null;
+  // Set while the workshop has the plan on hold.
+  paused_at: string | null;
+  resume_on: string | null;
+  hold_reason: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
   created_at: string;
 };
 
-export type InstalmentStatus = "scheduled" | "processing" | "paid" | "failed";
+// "cancelled": the plan was cancelled before this payment was taken, so it never will be.
+export type InstalmentStatus = "scheduled" | "processing" | "paid" | "failed" | "cancelled";
 
 export type Instalment = {
   id: number;
@@ -71,6 +79,9 @@ export type Instalment = {
   last_attempt_at: string | null;
   // Set while an automatic retry is pending for a failed instalment.
   next_retry_on: string | null;
+  // Paid some other way (cash, card at the counter) and recorded by the workshop.
+  paid_outside_stripe: boolean;
+  payment_note: string | null;
   created_at: string;
 };
 
@@ -82,7 +93,11 @@ export type NotificationKind =
   | "debit_missed"
   | "bank_details_needed"
   | "bank_details_updated"
-  | "plan_completed";
+  | "plan_completed"
+  | "plan_paused"
+  | "plan_resumed"
+  | "plan_cancelled"
+  | "payment_recorded";
 
 export type Notification = {
   id: number;
@@ -382,8 +397,30 @@ CREATE TABLE admin_invites (
 CREATE INDEX idx_admin_invites_email ON admin_invites (email, created_at);
 `;
 
+// Workshops can put a plan on hold, cancel it, or record a payment made some other way.
+const SCHEMA_V6 = `
+ALTER TABLE payment_plans DROP CONSTRAINT payment_plans_status_check;
+ALTER TABLE payment_plans ADD CONSTRAINT payment_plans_status_check
+  CHECK (status IN ('draft', 'active', 'paused', 'completed', 'cancelled', 'failed'));
+ALTER TABLE payment_plans
+  ADD COLUMN paused_at     date,
+  ADD COLUMN resume_on     date,
+  ADD COLUMN hold_reason   text,
+  ADD COLUMN cancelled_at  timestamptz,
+  ADD COLUMN cancel_reason text;
+
+ALTER TABLE instalments DROP CONSTRAINT instalments_status_check;
+ALTER TABLE instalments ADD CONSTRAINT instalments_status_check
+  CHECK (status IN ('scheduled', 'processing', 'paid', 'failed', 'cancelled'));
+ALTER TABLE instalments
+  ADD COLUMN paid_outside_stripe boolean NOT NULL DEFAULT false,
+  ADD COLUMN payment_note        text;
+
+CREATE INDEX idx_plans_resume_on ON payment_plans (resume_on) WHERE status = 'paused';
+`;
+
 // Applied in order, once each. Never edit a migration that has shipped; add a new one.
-const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
+const MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6];
 
 // The start of the current month in Sydney, for "this month" totals.
 export const SYDNEY_MONTH_START =

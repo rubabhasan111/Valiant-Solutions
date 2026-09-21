@@ -33,6 +33,7 @@ export default async function CustomerPlanPage({ params, searchParams }: PagePro
   const heading = {
     draft: `Hi ${firstName}, here's your repayment plan`,
     active: "Your repayment plan is active",
+    paused: "Your payments are on hold",
     failed: "Your plan needs new bank details",
     completed: "Your plan is paid off",
     cancelled: "This plan is no longer active",
@@ -121,6 +122,16 @@ export default async function CustomerPlanPage({ params, searchParams }: PagePro
             </div>
           </div>
           {setupForm}
+        </section>
+      )}
+
+      {plan.status === "paused" && (
+        <section className="mt-6 rounded-3xl bg-pending-pale px-6 py-5">
+          <p className="leading-relaxed text-ink">
+            {centre.name} has put your plan on hold, so nothing will be debited
+            {plan.resume_on ? ` until ${formatDate(plan.resume_on)}` : " until they start it again"}. Your remaining
+            payment dates will move back by the time the plan is on hold.
+          </p>
         </section>
       )}
 

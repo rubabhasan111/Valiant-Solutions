@@ -11,7 +11,7 @@ export default async function CustomerPlansPage() {
   const email = await requireCustomer();
   const plans = await listCustomerPlans(email);
 
-  const owing = plans.filter((plan) => plan.status === "active" || plan.status === "failed" || plan.status === "draft");
+  const owing = plans.filter((plan) => ["active", "paused", "failed", "draft"].includes(plan.status));
   const stillToPay = owing.reduce((sum, plan) => sum + plan.total_amount_cents - plan.paid_cents, 0);
 
   return (

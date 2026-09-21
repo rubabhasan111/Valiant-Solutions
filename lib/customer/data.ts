@@ -30,7 +30,7 @@ export async function listCustomerPlans(email: string): Promise<CustomerPlan[]> 
       WHERE c.email = $1
       GROUP BY p.id, sc.id
       ORDER BY
-        CASE p.status WHEN 'failed' THEN 0 WHEN 'draft' THEN 1 WHEN 'active' THEN 2 ELSE 3 END,
+        CASE p.status WHEN 'failed' THEN 0 WHEN 'draft' THEN 1 WHEN 'active' THEN 2 WHEN 'paused' THEN 2 ELSE 3 END,
         p.created_at DESC`,
     [email],
   );

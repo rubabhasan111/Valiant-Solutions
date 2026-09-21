@@ -1,19 +1,37 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowSquareOut, CheckCircle, EnvelopeSimple, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react/ssr";
-import type { Instalment } from "@/lib/db";
+import type { ReactNode } from "react";
+import {
+  ArrowSquareOut,
+  CheckCircle,
+  EnvelopeSimple,
+  PaperPlaneTilt,
+  PauseCircle,
+  WarningCircle,
+  XCircle,
+} from "@phosphor-icons/react/ssr";
+import type { Instalment, PlanStatus } from "@/lib/db";
 import { requireWorkshop } from "@/lib/auth/dal";
 import { formatAud } from "@/lib/money";
 import { formatAuMobile } from "@/lib/phone";
 import { latestPlanLinkDeliveries, type PlanLinkDelivery } from "@/lib/plan-links";
 import { getPlanDetail } from "@/lib/plans";
+import { MAX_NOTE_LENGTH, PLAN_ACTION_ERRORS, earliestResumeDate } from "@/lib/plan-actions";
 import { FREQUENCY_LABEL, formatDate, formatTimestamp } from "@/lib/schedule";
 import { appUrl } from "@/lib/stripe";
 import { CopyField } from "@/components/dashboard/CopyField";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { InstalmentStatusChip, PlanStatusChip } from "@/components/dashboard/StatusChip";
+import { ConfirmButton } from "@/components/forms/ConfirmButton";
 import { SubmitButton } from "@/components/forms/SubmitButton";
-import { resendPlanLink } from "./actions";
+import {
+  cancelPlanAction,
+  pausePlanAction,
+  recordPaidInFullAction,
+  recordPaymentAction,
+  resendPlanLink,
+  resumePlanAction,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Payment plan" };
 
@@ -22,6 +40,14 @@ const SENT_NOTICES = {
   email: "Sent again by email. The customer has no mobile on file, so no text was sent.",
   recent: "That link went out less than a minute ago, so it wasn't sent again.",
   "not-needed": "This plan isn't waiting on bank details.",
+} as const;
+
+const DONE_NOTICES = {
+  paused: "Plan put on hold. The customer has been told, and nothing will be debited until it resumes.",
+  resumed: "Plan resumed. The customer has been told, and payments are debited on their due dates again.",
+  cancelled: "Plan cancelled. The customer has been told, and nothing more will be debited.",
+  recorded: "Payment recorded. It won't be debited, and the customer has been sent a receipt.",
+  "paid-in-full": "Balance recorded as paid. Nothing more will be debited.",
 } as const;
 
 const DELIVERY_LABEL: Record<PlanLinkDelivery["status"], string> = {
@@ -35,7 +61,7 @@ const DELIVERY_LABEL: Record<PlanLinkDelivery["status"], string> = {
 export default async function PlanDetailPage({ params, searchParams }: PageProps<"/dashboard/plans/[id]">) {
   const { centre } = await requireWorkshop();
   const { id } = await params;
-  const { created, sent } = await searchParams;
+  const { created, sent, done, problem } = await searchParams;
 
   const detail = await getPlanDetail(centre.id, Number(id));
   if (!detail) notFound();
@@ -46,12 +72,28 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
   const setupLink = `${appUrl()}/pay/${plan.setup_token}`;
   const firstName = customer.full_name.split(" ")[0];
   const sentNotice = typeof sent === "string" && sent in SENT_NOTICES ? SENT_NOTICES[sent as keyof typeof SENT_NOTICES] : null;
-  const waitingOnBankDetails = plan.status === "draft" || plan.status === "failed";
+  const doneNotice = typeof done === "string" && done in DONE_NOTICES ? DONE_NOTICES[done as keyof typeof DONE_NOTICES] : null;
+  const problemNotice =
+    typeof problem === "string" && problem in PLAN_ACTION_ERRORS
+      ? PLAN_ACTION_ERRORS[problem as keyof typeof PLAN_ACTION_ERRORS]
+      : null;
+  const open = plan.status === "draft" || plan.status === "active" || plan.status === "paused" || plan.status === "failed";
+  // Payments can be marked as paid another way once the plan is running.
+  const canRecord = plan.status === "active" || plan.status === "paused" || plan.status === "failed";
+  const owingCents = instalments
+    .filter((i) => i.status === "scheduled" || i.status === "failed")
+    .reduce((sum, i) => sum + i.amount_cents, 0);
 
   const tiles = [
     { label: "Total", value: formatAud(plan.total_amount_cents) },
     { label: "Collected", value: formatAud(collectedCents) },
-    { label: "Still to come", value: formatAud(plan.total_amount_cents - collectedCents) },
+    // A cancelled plan's uncollected payments aren't coming, so they're not counted here.
+    {
+      label: "Still to come",
+      value: formatAud(
+        instalments.filter((i) => i.status !== "paid" && i.status !== "cancelled").reduce((sum, i) => sum + i.amount_cents, 0),
+      ),
+    },
     {
       label: "Schedule",
       value: `${plan.instalment_count} ${FREQUENCY_LABEL[plan.frequency].toLowerCase()}`,
@@ -111,6 +153,16 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
           Plan created. {firstName} has been sent their link to add bank details.
         </p>
       )}
+      {doneNotice && (
+        <p role="status" className="mt-6 rounded-2xl bg-accent-pale px-5 py-3 text-sm font-semibold text-accent-ink">
+          {doneNotice}
+        </p>
+      )}
+      {problemNotice && (
+        <p role="alert" className="mt-6 rounded-2xl bg-danger-pale px-5 py-3 text-sm font-semibold text-danger">
+          {problemNotice}
+        </p>
+      )}
       {sentNotice && (
         <p role="status" className="mt-6 rounded-2xl bg-accent-pale px-5 py-3 text-sm font-semibold text-accent-ink">
           {sentNotice}
@@ -163,6 +215,40 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
         </section>
       )}
 
+      {plan.status === "paused" && (
+        <section className="mt-8 rounded-3xl border border-edge bg-surface p-6 md:p-8">
+          <div className="flex flex-wrap items-start gap-4">
+            <PauseCircle size={28} weight="fill" className="mt-0.5 shrink-0 text-pending" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-extrabold tracking-tight">On hold</h2>
+              <p className="mt-2 max-w-[62ch] leading-relaxed text-body">
+                Nothing is being debited
+                {plan.resume_on
+                  ? ` until ${formatDate(plan.resume_on)}, when payments start again by themselves.`
+                  : " until you resume the plan."}{" "}
+                When it resumes, the remaining due dates move back by the time it was on hold.
+              </p>
+              {plan.hold_reason && <p className="mt-2 text-sm text-mute">Reason: {plan.hold_reason}</p>}
+            </div>
+            <form action={resumePlanAction.bind(null, plan.id)} className="shrink-0">
+              <SubmitButton pendingLabel="Resuming" className="btn btn-primary">
+                Resume now
+              </SubmitButton>
+            </form>
+          </div>
+        </section>
+      )}
+
+      {plan.status === "cancelled" && (
+        <section className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-3xl bg-edge/40 px-6 py-5">
+          <XCircle size={26} weight="fill" className="text-mute" />
+          <h2 className="font-bold">Cancelled{plan.cancelled_at ? ` ${formatTimestamp(plan.cancelled_at)}` : ""}</h2>
+          <p className="text-sm text-body">
+            No more payments will be debited.{plan.cancel_reason ? ` Reason: ${plan.cancel_reason}` : ""}
+          </p>
+        </section>
+      )}
+
       {plan.status === "failed" && (
         <section className="mt-8 rounded-3xl border border-edge bg-surface p-6 md:p-8">
           <div className="flex items-start gap-4">
@@ -200,6 +286,11 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
                   <th scope="col" className="px-5 py-3 font-semibold">Due</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Amount</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Status</th>
+                  {canRecord && (
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      <span className="sr-only">Record a payment</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="tabular divide-y divide-edge border-t border-edge">
@@ -209,8 +300,41 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
                     <td className="px-5 py-3">{formatDate(instalment.due_date)}</td>
                     <td className="px-5 py-3 font-semibold">{formatAud(instalment.amount_cents)}</td>
                     <td className="px-5 py-3">
-                      <InstalmentStatus instalment={instalment} firstName={firstName} planPaused={plan.status === "failed"} />
+                      <InstalmentStatus instalment={instalment} firstName={firstName} planStatus={plan.status} />
                     </td>
+                    {canRecord && (
+                      <td className="px-5 py-3 text-right">
+                        {(instalment.status === "scheduled" || instalment.status === "failed") && (
+                          <details className="inline-block text-left">
+                            <summary className="cursor-pointer list-none text-xs font-semibold text-accent-ink underline-offset-2 hover:underline">
+                              Paid another way?
+                            </summary>
+                            <form
+                              action={recordPaymentAction.bind(null, plan.id, instalment.id)}
+                              className="mt-2 grid w-56 gap-2"
+                            >
+                              <label htmlFor={`note-${instalment.id}`} className="text-xs text-mute">
+                                How was it paid? (optional)
+                              </label>
+                              <input
+                                id={`note-${instalment.id}`}
+                                name="note"
+                                maxLength={MAX_NOTE_LENGTH}
+                                placeholder="Cash at the counter"
+                                className="field text-sm"
+                              />
+                              <ConfirmButton
+                                pendingLabel="Recording"
+                                className="btn btn-secondary text-sm"
+                                confirmMessage={`Mark payment ${instalment.sequence} (${formatAud(instalment.amount_cents)}) as paid? It won't be debited.`}
+                              >
+                                Mark as paid
+                              </ConfirmButton>
+                            </form>
+                          </details>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -240,33 +364,133 @@ export default async function PlanDetailPage({ params, searchParams }: PageProps
               <dd className="font-semibold">{customer.vehicle_rego ?? "Not recorded"}</dd>
             </div>
           </dl>
-          {!waitingOnBankDetails && (
+          {(plan.status === "active" || plan.status === "paused") && (
             <p className="mt-4 text-xs leading-relaxed text-mute">
               Reminders are sent two days before each payment, and {firstName} gets a receipt each time one clears.
             </p>
           )}
         </section>
       </div>
+
+      {open && (
+        <section className="mt-6 rounded-3xl border border-edge bg-surface p-5 md:p-6">
+          <h2 className="text-lg font-bold">Manage this plan</h2>
+          <p className="mt-1 max-w-[62ch] text-sm text-body">
+            {firstName} gets {customer.phone ? "a text and an email" : "an email"} whenever you put the plan on hold, resume it or cancel it.
+          </p>
+          <div className="mt-4 grid gap-3">
+            {plan.status === "active" && (
+              <ManageOption title="Put on hold" hint="For hardship, a dispute, or while they change banks.">
+                <form action={pausePlanAction.bind(null, plan.id)} className="grid gap-3 sm:max-w-md">
+                  <NoteField id="hold-reason" name="reason" label="Reason (only you see this)" placeholder="Customer asked for a month off" />
+                  <div className="grid gap-2">
+                    <label htmlFor="resumeOn" className="text-sm font-semibold">
+                      Start payments again on <span className="font-normal text-mute">(optional)</span>
+                    </label>
+                    <input id="resumeOn" name="resumeOn" type="date" min={earliestResumeDate()} className="field" />
+                    <p className="text-xs text-mute">Leave empty to resume it yourself.</p>
+                  </div>
+                  <SubmitButton pendingLabel="Putting on hold" className="btn btn-secondary justify-self-start">
+                    Put on hold
+                  </SubmitButton>
+                </form>
+              </ManageOption>
+            )}
+
+            {canRecord && owingCents > 0 && (
+              <ManageOption
+                title="Paid off in full"
+                hint={`${firstName} paid the remaining ${formatAud(owingCents)} another way, so nothing more should be debited.`}
+              >
+                <form action={recordPaidInFullAction.bind(null, plan.id)} className="grid gap-3 sm:max-w-md">
+                  <NoteField id="full-note" name="note" label="How was it paid? (optional)" placeholder="Bank transfer" />
+                  <ConfirmButton
+                    pendingLabel="Recording"
+                    className="btn btn-secondary justify-self-start"
+                    confirmMessage={`Record the remaining ${formatAud(owingCents)} as paid? Nothing more will be debited.`}
+                  >
+                    Record as paid in full
+                  </ConfirmButton>
+                </form>
+              </ManageOption>
+            )}
+
+            <ManageOption title="Cancel plan" hint="Stops every payment still to come. This can't be undone." danger>
+              <form action={cancelPlanAction.bind(null, plan.id)} className="grid gap-3 sm:max-w-md">
+                <NoteField id="cancel-reason" name="reason" label="Reason (only you see this)" placeholder="Created by mistake" />
+                <ConfirmButton
+                  pendingLabel="Cancelling"
+                  className="btn btn-secondary justify-self-start text-danger"
+                  confirmMessage={`Cancel ${customer.full_name}'s plan? No more payments will be debited, and this can't be undone.`}
+                >
+                  Cancel plan
+                </ConfirmButton>
+              </form>
+            </ManageOption>
+          </div>
+        </section>
+      )}
     </main>
+  );
+}
+
+function ManageOption({
+  title,
+  hint,
+  danger,
+  children,
+}: {
+  title: string;
+  hint: string;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="rounded-2xl border border-edge px-4 py-3">
+      <summary className="cursor-pointer list-none">
+        <span className={`font-semibold ${danger ? "text-danger" : "text-ink"}`}>{title}</span>
+        <span className="mt-0.5 block text-sm text-mute">{hint}</span>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
+  );
+}
+
+function NoteField({ id, name, label, placeholder }: { id: string; name: string; label: string; placeholder: string }) {
+  return (
+    <div className="grid gap-2">
+      <label htmlFor={id} className="text-sm font-semibold">
+        {label}
+      </label>
+      <input id={id} name={name} maxLength={MAX_NOTE_LENGTH} placeholder={placeholder} className="field" />
+    </div>
   );
 }
 
 function InstalmentStatus({
   instalment,
   firstName,
-  planPaused,
+  planStatus,
 }: {
   instalment: Instalment;
   firstName: string;
-  planPaused: boolean;
+  planStatus: PlanStatus;
 }) {
+  const planPaused = planStatus === "failed";
   const note = (text: string) => <p className="mt-1 max-w-[24rem] text-xs text-mute">{text}</p>;
 
   return (
     <>
       <InstalmentStatusChip status={instalment.status} />
-      {instalment.status === "paid" && instalment.paid_at && note(`Cleared ${formatDate(instalment.paid_at)}`)}
-      {instalment.status === "failed" && (
+      {instalment.status === "paid" &&
+        instalment.paid_at &&
+        note(
+          instalment.paid_outside_stripe
+            ? `Paid another way, recorded ${formatDate(instalment.paid_at)}${instalment.payment_note ? `: ${instalment.payment_note}` : ""}`
+            : `Cleared ${formatDate(instalment.paid_at)}`,
+        )}
+      {instalment.status === "failed" && planStatus === "paused" && note("Collected again when the plan resumes.")}
+      {instalment.status === "failed" && planStatus !== "paused" && (
         <>
           <p className="mt-1 max-w-[24rem] text-xs text-danger">{instalment.failure_reason ?? "The debit failed."}</p>
           {note(

@@ -1,8 +1,8 @@
 import Stripe from "stripe";
-import { db, transaction, type InstalmentStatus } from "@/lib/db";
+import { db, transaction, type InstalmentStatus, type PlanStatus } from "@/lib/db";
 import { formatAud } from "@/lib/money";
 import { notify, queueCustomerEmail } from "@/lib/notifications";
-import { bankDetailsNeededSms, paymentFailedSms, receiptEmail } from "@/lib/plan-messages";
+import { bankDetailsNeededSms, paidOffEmail, paymentFailedSms, receiptEmail } from "@/lib/plan-messages";
 import { NEEDS_NEW_BANK_DETAILS, RETRY_DELAY_DAYS } from "@/lib/retry-policy";
 import { addDays, formatRetryDay, todayInSydney } from "@/lib/schedule";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -22,6 +22,7 @@ type InstalmentContext = {
   next_retry_on: string | null;
   stripe_payment_intent_id: string | null;
   plan_id: number;
+  plan_status: PlanStatus;
   description: string;
   instalment_count: number;
   total_amount_cents: number;
@@ -41,7 +42,7 @@ type InstalmentContext = {
 const CONTEXT_SELECT = `
   SELECT i.id AS instalment_id, i.sequence, i.amount_cents, i.status, i.attempt_count,
          i.next_retry_on, i.stripe_payment_intent_id,
-         p.id AS plan_id, p.description, p.instalment_count, p.total_amount_cents, p.setup_token,
+         p.id AS plan_id, p.status AS plan_status, p.description, p.instalment_count, p.total_amount_cents, p.setup_token,
          p.stripe_payment_method_id, p.stripe_mandate_id,
          c.full_name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.stripe_customer_id,
          sc.id AS centre_id, sc.name AS centre_name, sc.phone AS centre_phone, sc.stripe_account_id
@@ -112,10 +113,11 @@ async function markPaid(ctx: InstalmentContext, paymentIntentId: string) {
   );
 
   // Completed first: a plan that has just been paid off gets the "paid off" email rather
-  // than a receipt for the last payment.
+  // than a receipt for the last payment. A plan on hold can still finish this way, when a
+  // debit started before the hold clears.
   const completed = await db.run(
     `UPDATE payment_plans SET status = 'completed'
-      WHERE id = $1 AND status = 'active'
+      WHERE id = $1 AND status IN ('active', 'paused', 'failed')
         AND NOT EXISTS (SELECT 1 FROM instalments WHERE payment_plan_id = $1 AND status != 'paid')`,
     [ctx.plan_id],
   );
@@ -161,7 +163,6 @@ async function markPaid(ctx: InstalmentContext, paymentIntentId: string) {
   });
 
   if (completed) {
-    const name = firstName(ctx.customer_name);
     await notify({
       centreId: ctx.centre_id,
       planId: ctx.plan_id,
@@ -172,8 +173,12 @@ async function markPaid(ctx: InstalmentContext, paymentIntentId: string) {
       emailWorkshop: true,
       customerEmail: {
         to: ctx.customer_email,
-        subject: `Your ${ctx.centre_name} plan is paid off`,
-        text: `Hi ${name},\n\nYour final payment has cleared. All ${ctx.instalment_count} payments (${formatAud(ctx.total_amount_cents)}) for ${ctx.description} are complete, and no more debits will be taken.\n\n${ctx.centre_name}`,
+        ...paidOffEmail({
+          ...sender(ctx),
+          instalmentCount: ctx.instalment_count,
+          totalCents: ctx.total_amount_cents,
+          final: "Your final payment has cleared.",
+        }),
       },
     });
   }
@@ -192,6 +197,26 @@ const RECORD_FAILURE = `
 async function markFailed(ctx: InstalmentContext, failure: Failure) {
   const reason = asSentence(failure.message);
   const name = firstName(ctx.customer_name);
+
+  // A debit that started before the plan was put on hold or cancelled. Nothing is retried:
+  // a held plan collects it when it resumes, and a cancelled plan never does.
+  if (ctx.plan_status === "paused" || ctx.plan_status === "cancelled") {
+    await db.run(RECORD_FAILURE, [failure.paymentIntentId, reason, failure.code, null, ctx.instalment_id]);
+    await notify({
+      centreId: ctx.centre_id,
+      planId: ctx.plan_id,
+      instalmentId: ctx.instalment_id,
+      kind: "debit_failed",
+      title: `Debit failed for ${ctx.customer_name}`,
+      body: `${paymentLabel(ctx)} failed. ${reason} ${
+        ctx.plan_status === "paused"
+          ? "The plan is on hold, so it will be collected again when you resume it."
+          : "The plan is cancelled, so it won't be collected again."
+      }`,
+      dedupeKey: `debit_failed:${ctx.instalment_id}:${ctx.attempt_count}`,
+    });
+    return;
+  }
 
   if (failure.code && NEEDS_NEW_BANK_DETAILS.has(failure.code)) {
     await transaction(async (tx) => {
