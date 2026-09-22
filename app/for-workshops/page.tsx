@@ -178,6 +178,9 @@ export default function ForWorkshopsPage() {
         <p>Halfshaft is a product of Valiant Solutions. Payments are processed by Stripe.</p>
         <p className="mt-1">Direct debits are taken under a Direct Debit Request signed by your customer.</p>
         <p className="mt-3 flex gap-4">
+          <Link href="/guide" className="underline-offset-2 hover:text-ink hover:underline">
+            Setup guide
+          </Link>
           <Link href="/terms" className="underline-offset-2 hover:text-ink hover:underline">
               Terms
             </Link>

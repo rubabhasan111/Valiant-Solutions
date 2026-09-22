@@ -41,6 +41,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <p className="truncate text-xs text-mute">
             {role === "owner" ? "Owner" : "Staff"}, {user.email}
           </p>
+          <Link href="/guide" className="mt-3 block text-sm font-semibold text-body transition-colors hover:text-ink">
+            Setup guide
+          </Link>
           <form action={logout} className="mt-3">
             <button type="submit" className="flex items-center gap-2 text-sm font-semibold text-body transition-colors hover:text-ink">
               <SignOut size={18} />

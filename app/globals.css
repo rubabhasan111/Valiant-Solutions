@@ -52,6 +52,25 @@
   }
 }
 
+/* Printers skip background colours, so dark mode's light text would come out pale on white
+   paper. Print always uses the light palette, on white. Must stay after the dark block. */
+@media print {
+  :root {
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --ink: #0e0f0c;
+    --body: #2f312e;
+    --mute: #50524e;
+    --edge: #b9beb3;
+    --accent: #9fe870;
+    --on-accent: #0e0f0c;
+    --accent-ink: #163300;
+    --accent-pale: #ffffff;
+    --pending: #6f4400;
+    --pending-pale: #ffffff;
+  }
+}
+
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
