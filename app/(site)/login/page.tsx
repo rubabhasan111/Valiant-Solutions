@@ -25,6 +25,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           Sign up your workshop
         </Link>
       </p>
+      <p className="mt-3 text-center text-sm text-body">
+        Paying off a repair?{" "}
+        <Link href="/account/login" className="font-semibold text-ink underline underline-offset-2">
+          See your payments
+        </Link>
+      </p>
     </main>
   );
 }

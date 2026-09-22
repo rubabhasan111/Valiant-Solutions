@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GearSix, SignOut } from "@phosphor-icons/react/ssr";
 import { requireCustomer } from "@/lib/customer/session";
+import { SiteFooter } from "@/components/SiteFooter";
 import { customerLogout } from "./actions";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default async function CustomerLayout({ children }: { children: ReactNode
         </div>
       </header>
       <div className="flex-1">{children}</div>
+      <SiteFooter />
     </div>
   );
 }

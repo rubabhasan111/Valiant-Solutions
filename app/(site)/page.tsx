@@ -231,20 +231,6 @@ export default function Home() {
         </section>
       </HomeMotion>
 
-      <footer className="border-t border-edge">
-        <div className="mx-auto flex max-w-7xl flex-col gap-1 px-5 py-8 text-sm text-mute md:flex-row md:justify-between md:px-8">
-          <p className="font-semibold text-ink">Halfshaft</p>
-          <p className="flex flex-wrap gap-x-4 gap-y-1">
-            <span>Payments processed by Stripe. Test mode only.</span>
-            <Link href="/terms" className="underline-offset-2 hover:text-ink hover:underline">
-              Terms
-            </Link>
-            <Link href="/privacy" className="underline-offset-2 hover:text-ink hover:underline">
-              Privacy
-            </Link>
-          </p>
-        </div>
-      </footer>
     </main>
   );
 }

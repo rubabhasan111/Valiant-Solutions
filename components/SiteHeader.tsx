@@ -12,8 +12,11 @@ export function SiteHeader() {
           Halfshaft
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-4 sm:gap-6">
-          <Link href="/#how" className="hidden text-sm font-semibold text-body transition-colors hover:text-ink md:inline">
-            How it works
+          <Link
+            href="/for-workshops"
+            className="hidden whitespace-nowrap text-sm font-semibold text-body transition-colors hover:text-ink sm:inline"
+          >
+            For workshops
           </Link>
           <Link href="/login" className="whitespace-nowrap text-sm font-semibold text-body transition-colors hover:text-ink">
             Log in

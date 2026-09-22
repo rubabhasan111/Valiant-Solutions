@@ -56,18 +56,9 @@ const HANDLED = [
 
 export default function ForWorkshopsPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-12 md:py-16">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-2xl bg-accent text-on-accent">
-          <GearSix size={22} weight="bold" />
-        </span>
-        <div>
-          <p className="text-lg font-extrabold tracking-tight">Halfshaft</p>
-          <p className="text-sm text-mute">by Valiant Solutions</p>
-        </div>
-      </header>
-
-      <h1 className="mt-10 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-5xl">
+    <main className="mx-auto w-full max-w-3xl px-5 py-12 md:py-16">
+      <p className="text-sm font-semibold text-mute">Halfshaft for workshops</p>
+      <h1 className="mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-5xl">
         Let customers pay off the repair. Get paid like it was upfront.
       </h1>
       <p className="mt-5 max-w-[52ch] text-lg leading-relaxed text-body">
@@ -172,23 +163,19 @@ export default function ForWorkshopsPage() {
           A walk-through takes about ten minutes, using test payments so nothing real moves. You&apos;ll see exactly
           what your customers see.
         </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/shop/signup" className="btn bg-ink text-canvas hover:opacity-90">
+            Sign up your workshop
+          </Link>
+          <Link href="/guide" className="btn border border-on-accent/40 text-on-accent hover:bg-on-accent/10">
+            Read the setup guide
+          </Link>
+        </div>
       </section>
 
-      <footer className="mt-10 border-t border-edge pt-6 text-sm text-mute">
-        <p>Halfshaft is a product of Valiant Solutions. Payments are processed by Stripe.</p>
-        <p className="mt-1">Direct debits are taken under a Direct Debit Request signed by your customer.</p>
-        <p className="mt-3 flex gap-4">
-          <Link href="/guide" className="underline-offset-2 hover:text-ink hover:underline">
-            Setup guide
-          </Link>
-          <Link href="/terms" className="underline-offset-2 hover:text-ink hover:underline">
-              Terms
-            </Link>
-            <Link href="/privacy" className="underline-offset-2 hover:text-ink hover:underline">
-              Privacy
-            </Link>
-        </p>
-      </footer>
+      <p className="mt-8 text-sm text-mute">
+        Direct debits are taken under a Direct Debit Request your customer accepts on Stripe&apos;s secure page.
+      </p>
     </main>
   );
 }
