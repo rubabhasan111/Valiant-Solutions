@@ -22,7 +22,9 @@ export function SiteHeader() {
             Log in
           </Link>
           <Link href="/shop/signup" className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm">
-            Sign up<span className="hidden sm:inline">&nbsp;your workshop</span>
+            {/* One label per screen size: .btn spaces out its children, so the words can't be split. */}
+            <span className="sm:hidden">Sign up</span>
+            <span className="hidden sm:inline">Sign up your workshop</span>
           </Link>
         </nav>
       </div>
